@@ -1,0 +1,490 @@
+"""Pydantic schemas for API request/response validation"""
+
+from pydantic import BaseModel, Field, field_validator, ConfigDict
+from typing import Optional, Dict, List
+from datetime import datetime
+from enum import Enum
+
+
+# ============================================================================
+# Enums
+# ============================================================================
+
+class WaterQualityClassification(str, Enum):
+    """Water quality classification categories"""
+    SAFE = "Safe"
+    WARNING = "Warning"
+    UNSAFE = "Unsafe"
+
+
+class RiskLevel(str, Enum):
+    """Contamination risk levels"""
+    LOW = "Low"
+    MEDIUM = "Medium"
+    HIGH = "High"
+
+
+class TankStatus(str, Enum):
+    """Tank level status categories"""
+    EMPTY = "Empty"
+    HALF_FULL = "Half_Full"
+    FULL = "Full"
+    OVERFLOW = "Overflow"
+
+
+class UserRole(str, Enum):
+    """User role types"""
+    USER = "user"
+    ADMIN = "admin"
+
+
+# ============================================================================
+# Request Models
+# ============================================================================
+
+class SensorDataRequest(BaseModel):
+    """
+    Request model for sensor data from ESP32
+    
+    Validates sensor readings are within physical measurement ranges:
+    - pH: 0-14
+    - Turbidity: 0-3000 NTU
+    - Temperature: -55 to 125°C
+    - TDS: 0-1000 ppm
+    - Dissolved Oxygen: 0-20 mg/L
+    
+    Requirements: 1.1-1.5, 1.9, 15.1, 15.7
+    """
+    device_id: str = Field(..., min_length=1, max_length=100, description="Unique device identifier")
+    timestamp: datetime = Field(..., description="Reading timestamp in ISO8601 format")
+    ph: float = Field(..., ge=0.0, le=14.0, description="pH level (0-14)")
+    turbidity: float = Field(..., ge=0.0, le=3000.0, description="Turbidity in NTU (0-3000)")
+    temperature: float = Field(..., ge=-55.0, le=125.0, description="Temperature in Celsius (-55 to 125)")
+    tds: float = Field(..., ge=0.0, le=1000.0, description="Total Dissolved Solids in ppm (0-1000)")
+    dissolved_oxygen: float = Field(..., ge=0.0, le=20.0, description="Dissolved Oxygen in mg/L (0-20)")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "device_id": "ESP32_001",
+                "timestamp": "2025-01-15T10:30:00Z",
+                "ph": 7.2,
+                "turbidity": 15.5,
+                "temperature": 25.3,
+                "tds": 150.0,
+                "dissolved_oxygen": 8.5
+            }
+        }
+    )
+    
+    @field_validator('ph')
+    @classmethod
+    def validate_ph_precision(cls, v: float) -> float:
+        """Validate pH precision to ±0.1 units (Requirement 1.1)"""
+        return round(v, 1)
+    
+    @field_validator('turbidity')
+    @classmethod
+    def validate_turbidity_precision(cls, v: float) -> float:
+        """Validate turbidity precision to ±5 NTU (Requirement 1.2)"""
+        return round(v, 1)
+    
+    @field_validator('temperature')
+    @classmethod
+    def validate_temperature_precision(cls, v: float) -> float:
+        """Validate temperature precision to ±0.5°C (Requirement 1.3)"""
+        return round(v, 1)
+    
+    @field_validator('tds')
+    @classmethod
+    def validate_tds_precision(cls, v: float) -> float:
+        """Validate TDS precision to ±10 ppm (Requirement 1.4)"""
+        return round(v, 0)
+    
+    @field_validator('dissolved_oxygen')
+    @classmethod
+    def validate_do_precision(cls, v: float) -> float:
+        """Validate dissolved oxygen precision to ±0.2 mg/L (Requirement 1.5)"""
+        return round(v, 1)
+
+
+class TankLevelRequest(BaseModel):
+    """
+    Request model for tank level data from ESP32
+    
+    Requirements: 2.1, 15.2
+    """
+    device_id: str = Field(..., min_length=1, max_length=100, description="Unique device identifier")
+    timestamp: datetime = Field(..., description="Reading timestamp in ISO8601 format")
+    distance_cm: float = Field(..., ge=0.0, le=500.0, description="Distance from sensor to water surface in cm")
+    tank_height_cm: float = Field(..., ge=0.0, le=500.0, description="Total tank height in cm")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "device_id": "ESP32_001",
+                "timestamp": "2025-01-15T10:30:00Z",
+                "distance_cm": 45.2,
+                "tank_height_cm": 200.0
+            }
+        }
+    )
+    
+    @field_validator('distance_cm')
+    @classmethod
+    def validate_distance_precision(cls, v: float) -> float:
+        """Validate distance precision to ±2 cm (Requirement 2.1)"""
+        return round(v, 1)
+
+
+# ============================================================================
+# Response Models - SHAP Explanations
+# ============================================================================
+
+class SHAPFactor(BaseModel):
+    """Individual SHAP feature contribution"""
+    feature: str = Field(..., description="Feature name")
+    shap_value: float = Field(..., description="SHAP contribution value")
+    direction: str = Field(..., description="Direction of influence: 'increasing_risk' or 'decreasing_risk'")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "feature": "turbidity",
+                "shap_value": 0.45,
+                "direction": "increasing_risk"
+            }
+        }
+    )
+
+
+class SHAPExplanation(BaseModel):
+    """
+    SHAP explanation for model predictions
+    
+    Requirements: 5.3, 5.4, 5.5
+    """
+    shap_values: Dict[str, float] = Field(..., description="SHAP values for all features")
+    top_factors: List[SHAPFactor] = Field(..., description="Top contributing factors ranked by absolute SHAP value")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "shap_values": {
+                    "ph": 0.12,
+                    "turbidity": 0.45,
+                    "temperature": -0.08,
+                    "tds": 0.23,
+                    "dissolved_oxygen": -0.15
+                },
+                "top_factors": [
+                    {
+                        "feature": "turbidity",
+                        "shap_value": 0.45,
+                        "direction": "increasing_risk"
+                    },
+                    {
+                        "feature": "tds",
+                        "shap_value": 0.23,
+                        "direction": "increasing_risk"
+                    },
+                    {
+                        "feature": "dissolved_oxygen",
+                        "shap_value": -0.15,
+                        "direction": "decreasing_risk"
+                    }
+                ]
+            }
+        }
+    )
+
+
+# ============================================================================
+# Response Models - Classification and Risk Prediction
+# ============================================================================
+
+class ClassificationResult(BaseModel):
+    """
+    Water quality classification result
+    
+    Requirements: 3.1, 3.2, 15.3
+    """
+    quality: WaterQualityClassification = Field(..., description="Water quality classification")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Classification confidence score")
+    shap_explanation: SHAPExplanation = Field(..., description="SHAP explanation for classification")
+    timestamp: datetime = Field(..., description="Prediction timestamp")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "quality": "Safe",
+                "confidence": 0.92,
+                "shap_explanation": {
+                    "shap_values": {
+                        "ph": 0.12,
+                        "turbidity": 0.45,
+                        "temperature": -0.08,
+                        "tds": 0.23,
+                        "dissolved_oxygen": -0.15
+                    },
+                    "top_factors": [
+                        {
+                            "feature": "turbidity",
+                            "shap_value": 0.45,
+                            "direction": "increasing_risk"
+                        }
+                    ]
+                },
+                "timestamp": "2025-01-15T10:30:01Z"
+            }
+        }
+    )
+
+
+class RiskPredictionResult(BaseModel):
+    """
+    Contamination risk prediction result
+    
+    Requirements: 4.1, 4.2, 4.6, 4.7, 4.8, 15.4
+    """
+    risk_score: float = Field(..., ge=0.0, le=1.0, description="Risk score between 0.0 (no risk) and 1.0 (high risk)")
+    risk_level: RiskLevel = Field(..., description="Risk level classification")
+    shap_explanation: SHAPExplanation = Field(..., description="SHAP explanation for risk prediction")
+    timestamp: datetime = Field(..., description="Prediction timestamp")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "risk_score": 0.35,
+                "risk_level": "Low",
+                "shap_explanation": {
+                    "shap_values": {
+                        "ph": 0.05,
+                        "turbidity": 0.18,
+                        "temperature": -0.03,
+                        "tds": 0.10,
+                        "dissolved_oxygen": -0.08
+                    },
+                    "top_factors": [
+                        {
+                            "feature": "turbidity",
+                            "shap_value": 0.18,
+                            "direction": "increasing_risk"
+                        }
+                    ]
+                },
+                "timestamp": "2025-01-15T10:30:01Z"
+            }
+        }
+    )
+
+
+class SensorDataResponse(BaseModel):
+    """
+    Complete response for sensor data ingestion
+    
+    Requirements: 1.7, 3.1, 4.1, 5.1, 15.3, 15.4, 15.5
+    """
+    status: str = Field(..., description="Response status")
+    reading_id: str = Field(..., description="MongoDB ObjectId of stored reading")
+    classification: ClassificationResult = Field(..., description="Water quality classification")
+    risk_prediction: RiskPredictionResult = Field(..., description="Contamination risk prediction")
+    timestamp: datetime = Field(..., description="Response timestamp")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "status": "success",
+                "reading_id": "65a1b2c3d4e5f6g7h8i9j0k1",
+                "classification": {
+                    "quality": "Safe",
+                    "confidence": 0.92,
+                    "shap_explanation": {
+                        "shap_values": {},
+                        "top_factors": []
+                    },
+                    "timestamp": "2025-01-15T10:30:01Z"
+                },
+                "risk_prediction": {
+                    "risk_score": 0.35,
+                    "risk_level": "Low",
+                    "shap_explanation": {
+                        "shap_values": {},
+                        "top_factors": []
+                    },
+                    "timestamp": "2025-01-15T10:30:01Z"
+                },
+                "timestamp": "2025-01-15T10:30:01Z"
+            }
+        }
+    )
+
+
+class TankLevelResponse(BaseModel):
+    """
+    Response for tank level data
+    
+    Requirements: 2.2, 2.3, 2.4, 2.5, 2.6, 2.7
+    """
+    status: str = Field(..., description="Response status")
+    reading_id: str = Field(..., description="MongoDB ObjectId of stored reading")
+    tank_status: TankStatus = Field(..., description="Tank status classification")
+    level_percent: float = Field(..., ge=0.0, le=100.0, description="Tank level percentage")
+    volume_liters: float = Field(..., ge=0.0, description="Estimated water volume in liters")
+    timestamp: datetime = Field(..., description="Response timestamp")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "status": "success",
+                "reading_id": "65a1b2c3d4e5f6g7h8i9j0k2",
+                "tank_status": "Half_Full",
+                "level_percent": 55.0,
+                "volume_liters": 550.0,
+                "timestamp": "2025-01-15T10:30:01Z"
+            }
+        }
+    )
+
+
+# ============================================================================
+# Response Models - Current Status
+# ============================================================================
+
+class WaterQualityStatus(BaseModel):
+    """Current water quality status"""
+    classification: WaterQualityClassification = Field(..., description="Current classification")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Classification confidence")
+    parameters: Dict[str, float] = Field(..., description="Current sensor parameter values")
+    shap_explanation: SHAPExplanation = Field(..., description="SHAP explanation")
+    timestamp: datetime = Field(..., description="Reading timestamp")
+
+
+class ContaminationRiskStatus(BaseModel):
+    """Current contamination risk status"""
+    risk_score: float = Field(..., ge=0.0, le=1.0, description="Risk score")
+    risk_level: RiskLevel = Field(..., description="Risk level")
+    shap_explanation: SHAPExplanation = Field(..., description="SHAP explanation")
+    timestamp: datetime = Field(..., description="Prediction timestamp")
+
+
+class TankLevelStatus(BaseModel):
+    """Current tank level status"""
+    status: TankStatus = Field(..., description="Tank status")
+    level_percent: float = Field(..., ge=0.0, le=100.0, description="Level percentage")
+    volume_liters: float = Field(..., ge=0.0, description="Volume in liters")
+    timestamp: datetime = Field(..., description="Reading timestamp")
+
+
+class CurrentStatusResponse(BaseModel):
+    """
+    Complete current status response
+    
+    Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7
+    """
+    water_quality: WaterQualityStatus = Field(..., description="Current water quality status")
+    contamination_risk: ContaminationRiskStatus = Field(..., description="Current contamination risk")
+    tank_status: TankLevelStatus = Field(..., description="Current tank level status")
+
+
+# ============================================================================
+# Response Models - Historical Data
+# ============================================================================
+
+class HistoricalDataPoint(BaseModel):
+    """Single historical data point"""
+    timestamp: datetime = Field(..., description="Reading timestamp")
+    parameters: Dict[str, float] = Field(..., description="Sensor parameter values")
+    classification: WaterQualityClassification = Field(..., description="Water quality classification")
+    risk_score: float = Field(..., ge=0.0, le=1.0, description="Contamination risk score")
+    tank_level_percent: Optional[float] = Field(None, ge=0.0, le=100.0, description="Tank level percentage")
+
+
+class HistoricalDataResponse(BaseModel):
+    """
+    Historical data response
+    
+    Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7
+    """
+    data: List[HistoricalDataPoint] = Field(..., description="Historical data points")
+    count: int = Field(..., ge=0, description="Number of data points returned")
+    start_date: datetime = Field(..., description="Query start date")
+    end_date: datetime = Field(..., description="Query end date")
+
+
+# ============================================================================
+# Authentication Models
+# ============================================================================
+
+class UserRegisterRequest(BaseModel):
+    """User registration request"""
+    email: str = Field(..., min_length=3, max_length=255, description="User email address")
+    password: str = Field(..., min_length=8, max_length=100, description="User password (min 8 characters)")
+    full_name: str = Field(..., min_length=1, max_length=255, description="User full name")
+    role: UserRole = Field(default=UserRole.USER, description="User role")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "email": "user@example.com",
+                "password": "securepassword123",
+                "full_name": "John Doe",
+                "role": "user"
+            }
+        }
+    )
+
+
+class UserLoginRequest(BaseModel):
+    """User login request"""
+    email: str = Field(..., description="User email address")
+    password: str = Field(..., description="User password")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "email": "user@example.com",
+                "password": "securepassword123"
+            }
+        }
+    )
+
+
+class UserResponse(BaseModel):
+    """User information response"""
+    user_id: str = Field(..., description="User ID")
+    email: str = Field(..., description="User email")
+    full_name: str = Field(..., description="User full name")
+    role: UserRole = Field(..., description="User role")
+    created_at: datetime = Field(..., description="Account creation timestamp")
+
+
+class TokenResponse(BaseModel):
+    """JWT token response"""
+    access_token: str = Field(..., description="JWT access token")
+    token_type: str = Field(default="bearer", description="Token type")
+    expires_in: int = Field(..., description="Token expiration time in seconds")
+    user: UserResponse = Field(..., description="User information")
+
+
+# ============================================================================
+# Error Response Models
+# ============================================================================
+
+class ErrorResponse(BaseModel):
+    """Standard error response"""
+    status: str = Field(default="error", description="Response status")
+    message: str = Field(..., description="Error message")
+    detail: Optional[str] = Field(None, description="Detailed error information")
+    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Error timestamp")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "status": "error",
+                "message": "Invalid sensor data",
+                "detail": "pH value must be between 0 and 14",
+                "timestamp": "2025-01-15T10:30:00Z"
+            }
+        }
+    )
