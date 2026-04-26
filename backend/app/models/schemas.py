@@ -468,6 +468,205 @@ class TokenResponse(BaseModel):
 
 
 # ============================================================================
+# Configuration Models
+# ============================================================================
+
+class QualityThreshold(BaseModel):
+    """Threshold values for a single water quality parameter"""
+    safe_min: Optional[float] = Field(None, description="Minimum safe value")
+    safe_max: Optional[float] = Field(None, description="Maximum safe value")
+    unsafe_min: Optional[float] = Field(None, description="Minimum unsafe value")
+    unsafe_max: Optional[float] = Field(None, description="Maximum unsafe value")
+
+
+class TankDimensions(BaseModel):
+    """Tank physical dimensions"""
+    height_cm: float = Field(..., gt=0, description="Tank height in centimeters")
+    diameter_cm: float = Field(..., gt=0, description="Tank diameter in centimeters")
+    capacity_liters: float = Field(..., gt=0, description="Tank capacity in liters")
+
+
+class RiskThresholds(BaseModel):
+    """Risk level threshold values"""
+    low_max: float = Field(..., ge=0.0, le=1.0, description="Maximum risk score for Low level")
+    medium_max: float = Field(..., ge=0.0, le=1.0, description="Maximum risk score for Medium level")
+    
+    @field_validator('medium_max')
+    @classmethod
+    def validate_medium_greater_than_low(cls, v: float, info) -> float:
+        """Ensure medium_max > low_max"""
+        if 'low_max' in info.data and v <= info.data['low_max']:
+            raise ValueError('medium_max must be greater than low_max')
+        return v
+
+
+class SystemConfigResponse(BaseModel):
+    """
+    System configuration response
+    
+    Requirements: 14.1, 14.2, 14.3, 14.4
+    """
+    sensor_polling_interval_seconds: int = Field(..., ge=10, le=300, description="Sensor polling interval (10-300 seconds)")
+    quality_thresholds: Dict[str, QualityThreshold] = Field(..., description="Water quality thresholds per parameter")
+    risk_thresholds: RiskThresholds = Field(..., description="Contamination risk thresholds")
+    tank_dimensions: TankDimensions = Field(..., description="Tank physical dimensions")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "sensor_polling_interval_seconds": 30,
+                "quality_thresholds": {
+                    "ph": {
+                        "safe_min": 6.5,
+                        "safe_max": 8.5,
+                        "unsafe_min": 5.0,
+                        "unsafe_max": 10.0
+                    },
+                    "turbidity": {
+                        "safe_max": 5.0,
+                        "unsafe_max": 25.0
+                    },
+                    "temperature": {
+                        "safe_min": 15.0,
+                        "safe_max": 30.0,
+                        "unsafe_min": 5.0,
+                        "unsafe_max": 40.0
+                    },
+                    "tds": {
+                        "safe_max": 300.0,
+                        "unsafe_max": 600.0
+                    },
+                    "dissolved_oxygen": {
+                        "safe_min": 6.0,
+                        "unsafe_min": 4.0
+                    }
+                },
+                "risk_thresholds": {
+                    "low_max": 0.4,
+                    "medium_max": 0.7
+                },
+                "tank_dimensions": {
+                    "height_cm": 200.0,
+                    "diameter_cm": 100.0,
+                    "capacity_liters": 1570.8
+                }
+            }
+        }
+    )
+
+
+class SystemConfigUpdateRequest(BaseModel):
+    """
+    System configuration update request
+    
+    Requirements: 14.1, 14.2, 14.3, 14.4, 14.5, 14.6
+    """
+    sensor_polling_interval_seconds: Optional[int] = Field(None, ge=10, le=300, description="Sensor polling interval (10-300 seconds)")
+    quality_thresholds: Optional[Dict[str, QualityThreshold]] = Field(None, description="Water quality thresholds per parameter")
+    risk_thresholds: Optional[RiskThresholds] = Field(None, description="Contamination risk thresholds")
+    tank_dimensions: Optional[TankDimensions] = Field(None, description="Tank physical dimensions")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "sensor_polling_interval_seconds": 60,
+                "quality_thresholds": {
+                    "ph": {
+                        "safe_min": 6.5,
+                        "safe_max": 8.5,
+                        "unsafe_min": 5.0,
+                        "unsafe_max": 10.0
+                    }
+                },
+                "risk_thresholds": {
+                    "low_max": 0.3,
+                    "medium_max": 0.6
+                },
+                "tank_dimensions": {
+                    "height_cm": 250.0,
+                    "diameter_cm": 120.0,
+                    "capacity_liters": 2827.4
+                }
+            }
+        }
+    )
+
+
+class ConfigUpdateResponse(BaseModel):
+    """Configuration update response"""
+    status: str = Field(default="success", description="Response status")
+    message: str = Field(..., description="Success message")
+    updated_at: datetime = Field(..., description="Update timestamp")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "status": "success",
+                "message": "Configuration updated successfully",
+                "updated_at": "2025-01-15T10:30:00Z"
+            }
+        }
+    )
+
+
+# ============================================================================
+# Calibration Models
+# ============================================================================
+
+class SensorType(str, Enum):
+    """Sensor types for calibration"""
+    PH = "ph"
+    TURBIDITY = "turbidity"
+    TEMPERATURE = "temperature"
+    TDS = "tds"
+    DISSOLVED_OXYGEN = "dissolved_oxygen"
+
+
+class CalibrationRequest(BaseModel):
+    """
+    Sensor calibration request
+    
+    Requirements: 13.1, 13.2, 13.3, 13.6
+    """
+    device_id: str = Field(..., min_length=1, max_length=100, description="Device identifier")
+    sensor_type: SensorType = Field(..., description="Type of sensor to calibrate")
+    reference_value: float = Field(..., description="Known reference value")
+    current_reading: float = Field(..., description="Current sensor reading")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "device_id": "ESP32_001",
+                "sensor_type": "ph",
+                "reference_value": 7.0,
+                "current_reading": 7.3
+            }
+        }
+    )
+
+
+class CalibrationResponse(BaseModel):
+    """Sensor calibration response"""
+    status: str = Field(default="success", description="Response status")
+    calibration_offset: float = Field(..., description="Calculated calibration offset")
+    applied_at: datetime = Field(..., description="Calibration application timestamp")
+    device_id: str = Field(..., description="Device identifier")
+    sensor_type: str = Field(..., description="Sensor type")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "status": "success",
+                "calibration_offset": -0.3,
+                "applied_at": "2025-01-15T10:30:00Z",
+                "device_id": "ESP32_001",
+                "sensor_type": "ph"
+            }
+        }
+    )
+
+
+# ============================================================================
 # Error Response Models
 # ============================================================================
 

@@ -7,7 +7,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from fastapi.testclient import TestClient
 from app.main import app
 from app.config import settings
-from app.db.mongodb import mongodb
+from app.db.mongodb import mongodb as mongo_db
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -20,10 +20,10 @@ def event_loop_policy():
 @pytest_asyncio.fixture(scope="function", autouse=True)
 async def setup_test_db():
     """Setup database connection for all tests"""
-    await mongodb.connect()
+    await mongo_db.connect()
     
     # Clean up test data before each test
-    db = mongodb.get_database()
+    db = mongo_db.get_database()
     try:
         # Drop all collections in the test database to ensure clean state
         collection_names = await db.list_collection_names()
@@ -42,7 +42,7 @@ async def setup_test_db():
     except Exception as e:
         print(f"Warning: Could not clean up test database after test: {e}")
     
-    await mongodb.disconnect()
+    await mongo_db.disconnect()
 
 
 @pytest.fixture
@@ -104,3 +104,79 @@ def sample_tank_data():
         "distance_cm": 45.2,
         "tank_height_cm": 200
     }
+
+
+@pytest_asyncio.fixture
+async def test_user():
+    """Create a test user in the main database"""
+    from app.services.auth_service import auth_service
+    
+    # Use the main database that the app uses
+    db = mongo_db.get_database()
+    
+    user_data = {
+        "email": "testuser@example.com",
+        "password_hash": auth_service.hash_password("testpassword123"),
+        "full_name": "Test User",
+        "role": "user",
+        "is_active": True
+    }
+    
+    result = await db.users.insert_one(user_data)
+    user_data["_id"] = result.inserted_id
+    
+    yield user_data
+    
+    # Cleanup
+    await db.users.delete_one({"_id": result.inserted_id})
+
+
+@pytest_asyncio.fixture
+async def test_admin():
+    """Create a test admin user in the main database"""
+    from app.services.auth_service import auth_service
+    
+    # Use the main database that the app uses
+    db = mongo_db.get_database()
+    
+    admin_data = {
+        "email": "admin@example.com",
+        "password_hash": auth_service.hash_password("adminpassword123"),
+        "full_name": "Test Admin",
+        "role": "admin",
+        "is_active": True
+    }
+    
+    result = await db.users.insert_one(admin_data)
+    admin_data["_id"] = result.inserted_id
+    
+    yield admin_data
+    
+    # Cleanup
+    await db.users.delete_one({"_id": result.inserted_id})
+
+
+@pytest_asyncio.fixture
+async def user_token(test_user):
+    """Generate JWT token for test user"""
+    from app.services.auth_service import auth_service
+    return auth_service.create_access_token({"sub": test_user["email"], "role": test_user["role"]})
+
+
+@pytest_asyncio.fixture
+async def admin_token(test_admin):
+    """Generate JWT token for test admin"""
+    from app.services.auth_service import auth_service
+    return auth_service.create_access_token({"sub": test_admin["email"], "role": test_admin["role"]})
+
+
+@pytest.fixture
+def mongodb():
+    """Provide MongoDB instance for tests that need direct database access"""
+    return mongo_db
+
+
+@pytest_asyncio.fixture
+async def auth_headers(user_token):
+    """Generate authorization headers for authenticated requests"""
+    return {"Authorization": f"Bearer {user_token}"}

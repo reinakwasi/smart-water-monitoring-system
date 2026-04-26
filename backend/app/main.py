@@ -39,7 +39,30 @@ async def lifespan(app: FastAPI):
         logger.error(f"Failed to connect to database: {e}")
         raise
     
-    # TODO: Load ML models
+    # Initialize ML models and SHAP service
+    try:
+        from ml.ml_service import ml_service
+        from ml.shap_service import shap_service
+        
+        # ML models are loaded in ml_service.__init__
+        if ml_service.is_ready():
+            logger.info("ML models loaded successfully")
+            
+            # Initialize SHAP service with loaded models
+            shap_service.set_models(
+                classifier=ml_service.classifier,
+                risk_predictor=ml_service.risk_predictor
+            )
+            
+            if shap_service.is_ready():
+                logger.info("SHAP service initialized successfully")
+            else:
+                logger.warning("SHAP service initialization incomplete")
+        else:
+            logger.warning("ML models not fully loaded")
+    except Exception as e:
+        logger.error(f"Error initializing ML models and SHAP service: {e}")
+        # Don't raise - allow app to start even if ML models fail to load
     
     yield
     

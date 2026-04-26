@@ -164,8 +164,8 @@ The implementation follows an incremental approach where each task builds on pre
 
 ### Phase 3: Backend API Endpoints
 
-- [ ] 9. Implement sensor data ingestion endpoints
-  - [ ] 9.1 Create POST /api/v1/sensor-data endpoint
+- [x] 9. Implement sensor data ingestion endpoints
+  - [x] 9.1 Create POST /api/v1/sensor-data endpoint
     - Accept SensorDataRequest payload from ESP32
     - Validate sensor data using Pydantic model
     - Call MLService for classification and risk prediction
@@ -174,7 +174,7 @@ The implementation follows an incremental approach where each task builds on pre
     - Return SensorDataResponse with classification, risk, and SHAP values
     - _Requirements: 1.7, 3.1, 4.1, 5.1, 5.2, 11.1, 11.3_
   
-  - [ ] 9.2 Create POST /api/v1/tank-level endpoint
+  - [x] 9.2 Create POST /api/v1/tank-level endpoint
     - Accept TankLevelRequest payload from ESP32
     - Calculate tank level percentage and volume
     - Classify tank status (Empty, Half_Full, Full, Overflow)
@@ -193,15 +193,15 @@ The implementation follows an incremental approach where each task builds on pre
     - Verify data is persisted to MongoDB with correct structure
     - _Requirements: 1.7, 3.1, 4.1, 5.1, 11.1, 11.3_
 
-- [ ] 10. Implement status and historical data endpoints
-  - [ ] 10.1 Create GET /api/v1/current-status endpoint
+- [x] 10. Implement status and historical data endpoints
+  - [x] 10.1 Create GET /api/v1/current-status endpoint
     - Require JWT authentication
     - Query latest sensor reading and tank level from MongoDB
     - Return current water quality, risk, and tank status
     - Implement response caching (30 second TTL)
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 17.1_
   
-  - [ ] 10.2 Create GET /api/v1/historical-data endpoint
+  - [x] 10.2 Create GET /api/v1/historical-data endpoint
     - Require JWT authentication
     - Accept query parameters: start_date, end_date, parameter, device_id, limit
     - Query MongoDB with date range filter and projection
@@ -215,19 +215,19 @@ The implementation follows an incremental approach where each task builds on pre
     - Test authentication enforcement (401 for missing token)
     - _Requirements: 6.1, 10.7, 17.1_
 
-- [ ] 11. Implement configuration and calibration endpoints (admin only)
-  - [ ] 11.1 Create GET /api/v1/config endpoint
+- [x] 11. Implement configuration and calibration endpoints (admin only)
+  - [x] 11.1 Create GET /api/v1/config endpoint
     - Require admin authentication
     - Return current system configuration (thresholds, polling interval, tank dimensions)
     - _Requirements: 14.1, 14.2, 14.3, 14.4, 20.4_
   
-  - [ ] 11.2 Create PUT /api/v1/config endpoint
+  - [x] 11.2 Create PUT /api/v1/config endpoint
     - Require admin authentication
     - Validate configuration values are within acceptable ranges
     - Persist updated configuration to MongoDB
     - _Requirements: 14.1, 14.2, 14.3, 14.4, 14.5, 14.6, 20.4_
   
-  - [ ] 11.3 Create POST /api/v1/calibration endpoint
+  - [x] 11.3 Create POST /api/v1/calibration endpoint
     - Require admin authentication
     - Accept device_id, sensor_type, reference_value, current_reading
     - Calculate calibration offset
