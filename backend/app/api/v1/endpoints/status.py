@@ -78,11 +78,7 @@ async def get_current_status(
     db: AsyncIOMotorDatabase = Depends(mongodb.get_database)
 ):
     """
-    Get current water quality and tank status
-    
-    Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 17.1
-    
-    This endpoint:
+    Get current water quality and tank status    This endpoint:
     1. Requires JWT authentication
     2. Queries latest sensor reading and tank level from MongoDB
     3. Returns current water quality, risk, and tank status
@@ -310,11 +306,7 @@ async def get_historical_data(
     db: AsyncIOMotorDatabase = Depends(mongodb.get_database)
 ):
     """
-    Retrieve historical sensor readings and predictions
-    
-    Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7, 11.6, 11.7
-    
-    This endpoint:
+    Retrieve historical sensor readings and predictions    This endpoint:
     1. Requires JWT authentication
     2. Accepts query parameters: start_date, end_date, parameter, device_id, limit
     3. Queries MongoDB with date range filter and projection

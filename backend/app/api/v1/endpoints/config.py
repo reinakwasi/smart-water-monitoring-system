@@ -40,11 +40,7 @@ async def get_config(
     db: AsyncIOMotorDatabase = Depends(mongodb.get_database)
 ) -> SystemConfigResponse:
     """
-    Get current system configuration
-    
-    Requirements: 14.1, 14.2, 14.3, 14.4, 20.4
-    
-    Args:
+    Get current system configuration    Args:
         current_user: Current authenticated admin user
         db: MongoDB database instance
         
@@ -138,11 +134,7 @@ async def update_config(
     db: AsyncIOMotorDatabase = Depends(mongodb.get_database)
 ) -> ConfigUpdateResponse:
     """
-    Update system configuration
-    
-    Requirements: 14.1, 14.2, 14.3, 14.4, 14.5, 14.6, 20.4
-    
-    Args:
+    Update system configuration    Args:
         config_update: Configuration update request with new values
         current_user: Current authenticated admin user
         db: MongoDB database instance
@@ -252,11 +244,8 @@ async def update_config(
         {"$set": update_doc}
     )
     
-    if result.modified_count == 0:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update configuration"
-        )
+    # Note: We don't check modified_count because MongoDB may return 0 if values are identical
+    # The update operation itself succeeding is sufficient
     
     return ConfigUpdateResponse(
         status="success",
@@ -285,11 +274,7 @@ async def calibrate_sensor(
     db: AsyncIOMotorDatabase = Depends(mongodb.get_database)
 ) -> CalibrationResponse:
     """
-    Calibrate sensor by calculating offset from reference value
-    
-    Requirements: 13.1, 13.2, 13.3, 13.6, 20.4
-    
-    Args:
+    Calibrate sensor by calculating offset from reference value    Args:
         calibration: Calibration request with device_id, sensor_type, reference_value, current_reading
         current_user: Current authenticated admin user
         db: MongoDB database instance

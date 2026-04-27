@@ -9,9 +9,7 @@ class SensorReadingDocument(BaseModel):
     """
     MongoDB document model for sensor readings
     
-    Collection: sensor_readings
-    Requirements: 11.1, 11.3
-    """
+    Collection: sensor_readings    """
     device_id: str
     timestamp: datetime
     
@@ -73,9 +71,7 @@ class TankReadingDocument(BaseModel):
     """
     MongoDB document model for tank level readings
     
-    Collection: tank_readings
-    Requirements: 11.2
-    """
+    Collection: tank_readings    """
     device_id: str
     timestamp: datetime
     
@@ -109,9 +105,7 @@ class UserDocument(BaseModel):
     """
     MongoDB document model for users
     
-    Collection: users
-    Requirements: 20.1, 20.3, 20.6
-    """
+    Collection: users    """
     email: str
     password_hash: str  # bcrypt hashed password
     full_name: str
@@ -147,9 +141,7 @@ class SensorDeviceDocument(BaseModel):
     """
     MongoDB document model for sensor devices
     
-    Collection: sensor_devices
-    Requirements: 13.3, 13.4, 13.5
-    """
+    Collection: sensor_devices    """
     device_id: str
     device_name: str
     
@@ -197,9 +189,7 @@ class SystemConfigDocument(BaseModel):
     """
     MongoDB document model for system configuration
     
-    Collection: system_config
-    Requirements: 14.1, 14.2, 14.3, 14.4
-    """
+    Collection: system_config    """
     config_id: str = "default"  # Single document with fixed ID
     
     # Sensor polling configuration
@@ -289,9 +279,7 @@ class NotificationLogDocument(BaseModel):
     """
     MongoDB document model for notification logs
     
-    Collection: notification_logs
-    Requirements: 8.7, 9.6
-    """
+    Collection: notification_logs    """
     notification_type: str  # quality_change, risk_change, tank_status
     user_id: str
     device_id: str

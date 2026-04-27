@@ -28,6 +28,7 @@ async def setup_test_db():
         # Drop all collections in the test database to ensure clean state
         collection_names = await db.list_collection_names()
         for collection_name in collection_names:
+            # Delete all documents instead of dropping collection to preserve indexes
             await db[collection_name].delete_many({})
     except Exception as e:
         print(f"Warning: Could not clean up test database before test: {e}")
@@ -38,6 +39,7 @@ async def setup_test_db():
     try:
         collection_names = await db.list_collection_names()
         for collection_name in collection_names:
+            # Delete all documents to ensure clean state for next test
             await db[collection_name].delete_many({})
     except Exception as e:
         print(f"Warning: Could not clean up test database after test: {e}")

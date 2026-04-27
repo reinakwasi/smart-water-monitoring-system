@@ -1,10 +1,7 @@
 """XGBoost risk predictor training module
 
 This module handles training, evaluation, and persistence of the XGBoost
-contamination risk prediction model.
-
-Requirements: 12.3, 12.5, 12.6, 12.7, 12.8
-"""
+contamination risk prediction model."""
 
 import numpy as np
 import json
@@ -36,10 +33,7 @@ class RiskPredictorTrainer:
     - Training XGBoost with hyperparameter tuning
     - K-fold cross-validation (k=5)
     - Model evaluation with multiple metrics including AUC-ROC
-    - Model persistence with versioning
-    
-    Requirements: 12.3, 12.5, 12.6, 12.7, 12.8
-    """
+    - Model persistence with versioning    """
     
     def __init__(
         self,
@@ -72,10 +66,7 @@ class RiskPredictorTrainer:
         param_grid: Optional[Dict[str, list]] = None
     ):
         """
-        Train XGBoost model with optional hyperparameter tuning
-        
-        Requirement 12.3: Train Risk_Predictor using XGBoost with configurable hyperparameters
-        
+        Train XGBoost model with optional hyperparameter tuning        
         Args:
             X_train: Training feature matrix (with temporal features)
             y_train: Training target (risk scores or levels)
@@ -121,8 +112,7 @@ class RiskPredictorTrainer:
             grid_search = GridSearchCV(
                 estimator=base_model,
                 param_grid=param_grid,
-                cv=5,  # Requirement 12.6: k-fold cross-validation (k=5)
-                scoring=scoring,
+                cv=5,  #                scoring=scoring,
                 n_jobs=-1,
                 verbose=1
             )
@@ -174,10 +164,7 @@ class RiskPredictorTrainer:
         cv: int = 5
     ) -> Dict[str, float]:
         """
-        Perform k-fold cross-validation on the model
-        
-        Requirement 12.6: Perform k-fold cross-validation (k=5)
-        
+        Perform k-fold cross-validation on the model        
         Args:
             X: Feature matrix
             y: Target values
@@ -249,11 +236,7 @@ class RiskPredictorTrainer:
         y_test: np.ndarray
     ) -> Dict[str, Any]:
         """
-        Evaluate model on test data
-        
-        Requirement 12.5: Evaluate Risk_Predictor using accuracy, precision, recall, F1-score, and AUC-ROC
-        Requirement 12.8: Generate model evaluation report
-        
+        Evaluate model on test data        
         Args:
             X_test: Test feature matrix
             y_test: Test target values
@@ -360,10 +343,7 @@ class RiskPredictorTrainer:
         y_test: np.ndarray
     ) -> Dict[str, Any]:
         """
-        Generate comprehensive evaluation report
-        
-        Requirement 12.8: Generate model evaluation report including performance metrics
-        
+        Generate comprehensive evaluation report        
         Args:
             X_train: Training feature matrix
             y_train: Training target values
@@ -404,10 +384,7 @@ class RiskPredictorTrainer:
         metadata: Optional[Dict[str, Any]] = None
     ) -> Tuple[Path, Path]:
         """
-        Save trained model with versioning and metadata
-        
-        Requirement 12.7: Persist trained model artifacts in a versioned format
-        
+        Save trained model with versioning and metadata        
         Args:
             version: Model version string (e.g., "v1.0", "v2.1")
             metadata: Optional metadata dictionary to save with model
@@ -462,10 +439,7 @@ class RiskPredictorTrainer:
     
     def load_model(self, version: str = "v1.0"):
         """
-        Load a trained model from disk
-        
-        Requirement 12.9: Support loading different model versions
-        
+        Load a trained model from disk        
         Args:
             version: Model version string to load
             

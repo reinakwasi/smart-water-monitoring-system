@@ -239,8 +239,8 @@ The implementation follows an incremental approach where each task builds on pre
     - Test admin-only access enforcement
     - _Requirements: 14.5, 20.4_
 
-- [ ] 12. Implement notification service
-  - [ ] 12.1 Create NotificationService for Firebase Cloud Messaging
+- [x] 12. Implement notification service
+  - [x] 12.1 Create NotificationService for Firebase Cloud Messaging
     - Implement FCM notification sending with retry logic
     - Implement notification throttling (1 hour cooldown per notification type)
     - Create send_quality_change_notification method
@@ -249,7 +249,7 @@ The implementation follows an incremental approach where each task builds on pre
     - Handle FCM errors and invalid tokens
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 9.1, 9.2, 9.3, 9.4, 9.5, 9.6_
   
-  - [ ] 12.2 Integrate notifications into sensor data endpoint
+  - [x] 12.2 Integrate notifications into sensor data endpoint
     - Detect water quality classification changes
     - Detect contamination risk level changes
     - Detect tank status changes
@@ -262,8 +262,8 @@ The implementation follows an incremental approach where each task builds on pre
     - Test FCM error handling and retry logic
     - _Requirements: 8.7, 9.6, 16.6_
 
-- [ ] 13. Implement health check and error handling
-  - [ ] 13.1 Create GET /api/v1/health endpoint
+- [x] 13. Implement health check and error handling
+  - [x] 13.1 Create GET /api/v1/health endpoint
     - Check MongoDB connection status and latency
     - Check ML models loaded status and versions
     - Check notification service status
@@ -271,7 +271,7 @@ The implementation follows an incremental approach where each task builds on pre
     - Return overall system health (healthy/degraded/unhealthy)
     - _Requirements: 19.1, 19.2, 19.3, 19.4, 19.5, 19.6_
   
-  - [ ] 13.2 Implement global error handling middleware
+  - [x] 13.2 Implement global error handling middleware
     - Handle database connection failures (return 503)
     - Handle validation errors (return 400 with descriptive message)
     - Handle authentication errors (return 401)
@@ -285,13 +285,13 @@ The implementation follows an incremental approach where each task builds on pre
     - Test expired JWT token (401 response)
     - _Requirements: 16.3, 16.7_
 
-- [ ] 14. Implement rate limiting and security hardening
-  - [ ] 14.1 Add rate limiting middleware
+- [x] 14. Implement rate limiting and security hardening
+  - [x] 14.1 Add rate limiting middleware
     - Implement rate limiter (100 requests per minute per IP)
     - Return 429 status when rate limit exceeded
     - _Requirements: 17.7_
   
-  - [ ] 14.2 Configure HTTPS/TLS for production
+  - [x] 14.2 Configure HTTPS/TLS for production
     - Configure uvicorn with SSL certificates
     - Enforce HTTPS for all API endpoints
     - _Requirements: 17.5_
@@ -302,26 +302,26 @@ The implementation follows an incremental approach where each task builds on pre
     - Test JWT token expiration
     - _Requirements: 17.5, 17.7_
 
-- [ ] 15. Checkpoint - Backend API complete
+- [x] 15. Checkpoint - Backend API complete
   - Ensure all tests pass, ask the user if questions arise.
 
 ### Phase 4: ESP32 Sensor Module
 
-- [ ] 16. Set up ESP32 development environment
+- [x] 16. Set up ESP32 development environment
   - Install Arduino IDE or PlatformIO
   - Install ESP32 board support package
   - Install required libraries (WiFi, HTTPClient, ArduinoJson, OneWire, DallasTemperature)
   - Create project structure with main sketch and sensor modules
   - _Requirements: 1.1-1.5_
 
-- [ ] 17. Implement sensor reading functions
-  - [ ] 17.1 Create sensor initialization and calibration
+- [x] 17. Implement sensor reading functions
+  - [x] 17.1 Create sensor initialization and calibration
     - Initialize all sensor pins (analog and digital)
     - Load calibration offsets from EEPROM
     - Implement sensor health check on startup
     - _Requirements: 1.1-1.5, 13.3, 13.4, 13.5_
   
-  - [ ] 17.2 Implement individual sensor read functions
+  - [x] 17.2 Implement individual sensor read functions
     - Implement readPH() with analog-to-pH conversion
     - Implement readTurbidity() with analog-to-NTU conversion
     - Implement readTemperature() using DS18B20 digital sensor
@@ -331,35 +331,35 @@ The implementation follows an incremental approach where each task builds on pre
     - Apply calibration offsets to all readings
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 2.1, 13.3_
   
-  - [ ] 17.3 Implement sensor data acquisition with validation
+  - [x] 17.3 Implement sensor data acquisition with validation
     - Create acquireSensorData() function to read all sensors
     - Validate each reading is within physical sensor range
     - Handle sensor failures gracefully (log error, continue with remaining sensors)
     - Mark failed sensor readings as NaN
     - _Requirements: 1.6, 1.8, 1.9, 16.1_
 
-- [ ] 18. Implement WiFi and HTTP communication
-  - [ ] 18.1 Create WiFi connection manager
+- [x] 18. Implement WiFi and HTTP communication
+  - [x] 18.1 Create WiFi connection manager
     - Implement WiFi connection with retry logic
     - Handle WiFi disconnection and reconnection
     - Store WiFi credentials in EEPROM or config file
     - _Requirements: 1.7, 16.1_
   
-  - [ ] 18.2 Implement HTTP client for backend communication
+  - [x] 18.2 Implement HTTP client for backend communication
     - Create transmitReading() function to POST sensor data to backend
     - Create transmitTankLevel() function to POST tank level to backend
     - Implement exponential backoff retry (1s, 2s, 4s)
     - Handle HTTP errors (4xx, 5xx) appropriately
     - _Requirements: 1.7, 16.1_
   
-  - [ ] 18.3 Implement reading buffer for offline operation
+  - [x] 18.3 Implement reading buffer for offline operation
     - Create circular buffer to store up to 100 readings in SPIFFS
     - Buffer readings when network is unavailable
     - Transmit buffered readings when connectivity restored
     - _Requirements: 16.1, 16.2_
 
-- [ ] 19. Implement main sensor loop
-  - [ ] 19.1 Create main loop with 30-second polling interval
+- [x] 19. Implement main sensor loop
+  - [x] 19.1 Create main loop with 30-second polling interval
     - Implement timer-based sensor polling (every 30 seconds)
     - Acquire sensor data and tank level
     - Transmit to backend if connected, otherwise buffer
@@ -373,7 +373,7 @@ The implementation follows an incremental approach where each task builds on pre
     - Test offline buffering and recovery
     - _Requirements: 1.1-1.9, 2.1, 16.1, 16.2_
 
-- [ ] 20. Checkpoint - ESP32 firmware complete
+- [x] 20. Checkpoint - ESP32 firmware complete
   - Ensure all tests pass, ask the user if questions arise.
 
 ### Phase 5: React Native Mobile Application

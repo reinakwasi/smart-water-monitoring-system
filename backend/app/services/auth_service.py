@@ -10,10 +10,7 @@ from app.config import settings
 
 class AuthService:
     """
-    Authentication service handling password hashing and JWT operations
-    
-    Requirements: 17.1, 17.2, 17.3, 20.6
-    """
+    Authentication service handling password hashing and JWT operations    """
     
     def __init__(self):
         # JWT configuration
@@ -24,11 +21,7 @@ class AuthService:
     
     def hash_password(self, password: str) -> str:
         """
-        Hash a password using bcrypt with configured cost factor
-        
-        Requirement 17.1: Password hashing with bcrypt (cost factor ≥ 10)
-        Requirement 20.6: Hash passwords using secure algorithm (bcrypt with cost factor ≥ 10)
-        
+        Hash a password using bcrypt with configured cost factor        
         Args:
             password: Plain text password
             
@@ -67,10 +60,7 @@ class AuthService:
         expires_delta: Optional[timedelta] = None
     ) -> str:
         """
-        Create a JWT access token with configurable expiration
-        
-        Requirement 17.2: JWT token generation with configurable expiration
-        
+        Create a JWT access token with configurable expiration        
         Args:
             data: Dictionary of claims to encode in the token
             expires_delta: Optional custom expiration time
@@ -106,10 +96,7 @@ class AuthService:
     
     def decode_token(self, token: str) -> Optional[Dict]:
         """
-        Decode and validate a JWT token
-        
-        Requirement 17.3: Token validation and decoding
-        
+        Decode and validate a JWT token        
         Args:
             token: JWT token string to decode
             

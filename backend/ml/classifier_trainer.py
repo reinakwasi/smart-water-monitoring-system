@@ -1,10 +1,7 @@
 """Random Forest classifier training module
 
 This module handles training, evaluation, and persistence of the Random Forest
-water quality classification model.
-
-Requirements: 12.2, 12.4, 12.6, 12.7, 12.8
-"""
+water quality classification model."""
 
 import numpy as np
 import json
@@ -32,10 +29,7 @@ class ClassifierTrainer:
     - Training Random Forest with hyperparameter tuning
     - K-fold cross-validation (k=5)
     - Model evaluation with multiple metrics
-    - Model persistence with versioning
-    
-    Requirements: 12.2, 12.4, 12.6, 12.7, 12.8
-    """
+    - Model persistence with versioning    """
     
     def __init__(
         self,
@@ -65,10 +59,7 @@ class ClassifierTrainer:
         param_grid: Optional[Dict[str, list]] = None
     ) -> RandomForestClassifier:
         """
-        Train Random Forest classifier with optional hyperparameter tuning
-        
-        Requirement 12.2: Train ML_Classifier using Random Forest with configurable hyperparameters
-        
+        Train Random Forest classifier with optional hyperparameter tuning        
         Args:
             X_train: Training feature matrix
             y_train: Training target labels
@@ -103,8 +94,7 @@ class ClassifierTrainer:
             grid_search = GridSearchCV(
                 estimator=base_model,
                 param_grid=param_grid,
-                cv=5,  # Requirement 12.6: k-fold cross-validation (k=5)
-                scoring='f1_weighted',
+                cv=5,  #                scoring='f1_weighted',
                 n_jobs=-1,
                 verbose=1
             )
@@ -141,10 +131,7 @@ class ClassifierTrainer:
         cv: int = 5
     ) -> Dict[str, float]:
         """
-        Perform k-fold cross-validation on the model
-        
-        Requirement 12.6: Perform k-fold cross-validation (k=5)
-        
+        Perform k-fold cross-validation on the model        
         Args:
             X: Feature matrix
             y: Target labels
@@ -194,11 +181,7 @@ class ClassifierTrainer:
         y_test: np.ndarray
     ) -> Dict[str, Any]:
         """
-        Evaluate model on test data
-        
-        Requirement 12.4: Evaluate ML_Classifier using accuracy, precision, recall, and F1-score
-        Requirement 12.8: Generate model evaluation report including confusion matrix
-        
+        Evaluate model on test data        
         Args:
             X_test: Test feature matrix
             y_test: Test target labels
@@ -267,10 +250,7 @@ class ClassifierTrainer:
         y_test: np.ndarray
     ) -> Dict[str, Any]:
         """
-        Generate comprehensive evaluation report
-        
-        Requirement 12.8: Generate model evaluation report including confusion matrix and performance metrics
-        
+        Generate comprehensive evaluation report        
         Args:
             X_train: Training feature matrix
             y_train: Training target labels
@@ -308,10 +288,7 @@ class ClassifierTrainer:
         metadata: Optional[Dict[str, Any]] = None
     ) -> Tuple[Path, Path]:
         """
-        Save trained model with versioning and metadata
-        
-        Requirement 12.7: Persist trained model artifacts in a versioned format
-        
+        Save trained model with versioning and metadata        
         Args:
             version: Model version string (e.g., "v1.0", "v2.1")
             metadata: Optional metadata dictionary to save with model
@@ -360,10 +337,7 @@ class ClassifierTrainer:
     
     def load_model(self, version: str = "v1.0") -> RandomForestClassifier:
         """
-        Load a trained model from disk
-        
-        Requirement 12.9: Support loading different model versions
-        
+        Load a trained model from disk        
         Args:
             version: Model version string to load
             

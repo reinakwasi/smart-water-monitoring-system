@@ -37,11 +37,7 @@ async def register_user(
     db: AsyncIOMotorDatabase = Depends(mongodb.get_database)
 ):
     """
-    Register a new user account
-    
-    Requirements: 20.1, 20.6
-    
-    Creates a new user with hashed password and returns user information.
+    Register a new user account    Creates a new user with hashed password and returns user information.
     Default role is 'user' unless specified otherwise.
     
     Args:
@@ -118,11 +114,7 @@ async def login_user(
     db: AsyncIOMotorDatabase = Depends(mongodb.get_database)
 ):
     """
-    Authenticate user and issue JWT token
-    
-    Requirements: 20.2, 17.2
-    
-    Validates user credentials and returns a JWT access token with user information.
+    Authenticate user and issue JWT token    Validates user credentials and returns a JWT access token with user information.
     Token expires after the configured duration (default 60 minutes).
     
     Args:
@@ -215,11 +207,7 @@ async def refresh_token(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Refresh JWT token
-    
-    Requirement: 20.3
-    
-    Issues a new JWT token for an authenticated user. The old token must be valid.
+    Refresh JWT token    Issues a new JWT token for an authenticated user. The old token must be valid.
     This allows users to extend their session without re-entering credentials.
     
     Args:

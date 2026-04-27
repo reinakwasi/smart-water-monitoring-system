@@ -1,10 +1,7 @@
 """ML inference service for water quality classification and risk prediction
 
 This module provides the MLService class that loads trained models and performs
-real-time inference for water quality classification and contamination risk prediction.
-
-Requirements: 3.1, 3.2, 3.3, 4.1, 4.2, 4.3, 12.9
-"""
+real-time inference for water quality classification and contamination risk prediction."""
 
 import numpy as np
 import joblib
@@ -22,10 +19,7 @@ class MLService:
     - Loading trained Random Forest classifier and XGBoost risk predictor
     - Real-time water quality classification
     - Real-time contamination risk prediction
-    - Model version management
-    
-    Requirements: 3.1, 3.2, 3.3, 4.1, 4.2, 4.3, 12.9
-    """
+    - Model version management    """
     
     def __init__(
         self,
@@ -63,10 +57,7 @@ class MLService:
     
     def _load_models(self):
         """
-        Load trained models from disk
-        
-        Requirement 12.9: Support loading different model versions
-        """
+        Load trained models from disk        """
         # Load classifier
         try:
             classifier_dir = self.model_dir / f"classifier_{self.classifier_version}"
@@ -111,10 +102,7 @@ class MLService:
         risk_predictor_version: Optional[str] = None
     ):
         """
-        Reload models with different versions
-        
-        Requirement 12.9: Support loading different model versions for A/B testing
-        
+        Reload models with different versions        
         Args:
             classifier_version: New classifier version to load (optional)
             risk_predictor_version: New risk predictor version to load (optional)
@@ -132,12 +120,7 @@ class MLService:
         sensor_data: Dict[str, float]
     ) -> Dict[str, Any]:
         """
-        Classify water quality based on sensor readings
-        
-        Requirement 3.1: Classify water quality within 500 milliseconds
-        Requirement 3.2: Output exactly one Quality_Classification per reading
-        Requirement 3.3: Use all five sensor parameters as input features
-        
+        Classify water quality based on sensor readings        
         Args:
             sensor_data: Dictionary containing sensor readings:
                 - ph: pH level (0-14)
@@ -206,12 +189,7 @@ class MLService:
         window_size: int = 10
     ) -> Dict[str, Any]:
         """
-        Predict contamination risk based on current and historical readings
-        
-        Requirement 4.1: Generate risk prediction within 500 milliseconds
-        Requirement 4.2: Output risk score between 0.0 (no risk) and 1.0 (high risk)
-        Requirement 4.3: Use current and historical data as input features
-        
+        Predict contamination risk based on current and historical readings        
         Args:
             current_reading: Dictionary containing current sensor readings
             historical_readings: List of historical sensor readings (optional)

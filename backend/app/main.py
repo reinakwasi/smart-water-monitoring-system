@@ -1,7 +1,8 @@
-"""FastAPI application entry point"""
-
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from slowapi.errors import RateLimitExceeded
 from contextlib import asynccontextmanager
 import logging
 
@@ -9,86 +10,87 @@ from app.config import settings
 from app.utils.logger import setup_logging, get_logger
 from app.db.mongodb import mongodb
 from app.api.v1.router import api_router
+from app.middleware import (
+    global_error_handler,
+    validation_exception_handler,
+    http_exception_handler,
+    general_exception_handler,
+    limiter,
+    rate_limit_exceeded_handler
+)
 
-
-# Setup logging before creating the app
 setup_logging()
 logger = get_logger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan events"""
     # Startup
-    logger.info(
-        "Starting Water Quality Monitoring System",
-        extra={
-            "extra_fields": {
-                "app_name": settings.app_name,
-                "version": settings.app_version,
-                "debug": settings.debug
-            }
-        }
-    )
+    logger.info(f"Starting {settings.app_name}")
     
-    # Initialize database connection
+    # Connect to database
     try:
         await mongodb.connect()
-        logger.info("Database connection established")
+        logger.info("Database connected")
     except Exception as e:
-        logger.error(f"Failed to connect to database: {e}")
+        logger.error(f"Database connection failed: {e}")
         raise
     
-    # Initialize ML models and SHAP service
+    # Load ML models
     try:
         from ml.ml_service import ml_service
         from ml.shap_service import shap_service
         
-        # ML models are loaded in ml_service.__init__
         if ml_service.is_ready():
-            logger.info("ML models loaded successfully")
-            
-            # Initialize SHAP service with loaded models
+            logger.info("ML models loaded")
             shap_service.set_models(
                 classifier=ml_service.classifier,
                 risk_predictor=ml_service.risk_predictor
             )
-            
             if shap_service.is_ready():
-                logger.info("SHAP service initialized successfully")
-            else:
-                logger.warning("SHAP service initialization incomplete")
+                logger.info("SHAP service ready")
         else:
-            logger.warning("ML models not fully loaded")
+            logger.warning("ML models not loaded")
     except Exception as e:
-        logger.error(f"Error initializing ML models and SHAP service: {e}")
-        # Don't raise - allow app to start even if ML models fail to load
+        logger.error(f"ML initialization error: {e}")
+    
+    # Initialize notifications
+    try:
+        from app.services.notification_service import initialize_notification_service
+        notification_svc = initialize_notification_service(settings.fcm_server_key)
+        if notification_svc:
+            logger.info("Notification service ready")
+    except Exception as e:
+        logger.error(f"Notification service error: {e}")
     
     yield
     
     # Shutdown
-    logger.info("Shutting down Water Quality Monitoring System")
-    
-    # Close database connection
+    logger.info("Shutting down")
     try:
         await mongodb.disconnect()
-        logger.info("Database connection closed")
+        logger.info("Database disconnected")
     except Exception as e:
-        logger.error(f"Error closing database connection: {e}")
-    
-    # TODO: Cleanup resources
+        logger.error(f"Shutdown error: {e}")
 
 
-# Create FastAPI application
+# Create app
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
-    description="Intelligent IoT-based water quality monitoring with ML predictions and explainable AI",
+    description="Water quality monitoring with ML predictions",
     lifespan=lifespan,
     debug=settings.debug
 )
 
-# Configure CORS
+# Rate limiting
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+
+from slowapi.middleware import SlowAPIMiddleware
+app.add_middleware(SlowAPIMiddleware)
+
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -97,13 +99,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include API v1 router
+# Error handling
+app.middleware("http")(global_error_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+app.add_exception_handler(Exception, general_exception_handler)
+
+# API routes
 app.include_router(api_router, prefix=settings.api_v1_prefix)
 
 
+@limiter.limit(f"{settings.rate_limit_per_minute}/minute")
 @app.get("/")
-async def root():
-    """Root endpoint"""
+async def root(request: Request):
     return {
         "message": "Water Quality Monitoring System API",
         "version": settings.app_version,
@@ -113,7 +121,6 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Basic health check endpoint"""
     return {
         "status": "healthy",
         "service": settings.app_name,
@@ -124,10 +131,22 @@ async def health_check():
 if __name__ == "__main__":
     import uvicorn
     
+    ssl_config = {}
+    if settings.ssl_enabled:
+        if settings.ssl_certfile and settings.ssl_keyfile:
+            ssl_config = {
+                "ssl_certfile": settings.ssl_certfile,
+                "ssl_keyfile": settings.ssl_keyfile
+            }
+            logger.info("Starting with HTTPS enabled")
+        else:
+            logger.warning("SSL enabled but no certificates provided")
+    
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
         port=8000,
         reload=settings.debug,
-        log_level=settings.log_level.lower()
+        log_level=settings.log_level.lower(),
+        **ssl_config
     )

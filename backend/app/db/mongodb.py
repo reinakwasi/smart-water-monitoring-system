@@ -104,7 +104,7 @@ class MongoDB:
         Returns:
             dict: Health status with connection state and latency
         """
-        if not self.client or not self.db:
+        if self.client is None or self.db is None:
             return {
                 "status": "disconnected",
                 "latency_ms": None

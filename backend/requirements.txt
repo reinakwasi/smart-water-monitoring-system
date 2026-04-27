@@ -30,5 +30,8 @@ pytest-asyncio==0.21.1
 pytest-cov==4.1.0
 hypothesis==6.92.1
 
+# Rate Limiting
+slowapi==0.1.9
+
 # Utilities
 python-dotenv==1.0.0

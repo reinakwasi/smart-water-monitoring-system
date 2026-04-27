@@ -1,10 +1,7 @@
 """SHAP explainability service for ML model interpretability
 
 This module provides the SHAPService class that generates SHAP explanations
-for water quality classification and contamination risk predictions.
-
-Requirements: 5.1, 5.2, 5.3
-"""
+for water quality classification and contamination risk predictions."""
 
 import numpy as np
 import shap
@@ -20,10 +17,7 @@ class SHAPService:
     - Computing SHAP values for classification predictions
     - Computing SHAP values for risk predictions
     - Ranking features by importance
-    - Generating human-readable explanations
-    
-    Requirements: 5.1, 5.2, 5.3
-    """
+    - Generating human-readable explanations    """
     
     def __init__(
         self,
@@ -82,11 +76,7 @@ class SHAPService:
     
     def _initialize_explainers(self):
         """
-        Initialize SHAP TreeExplainer for both models
-        
-        Requirement 5.1: Initialize TreeExplainer for Random Forest classifier
-        Requirement 5.2: Initialize TreeExplainer for XGBoost predictor
-        """
+        Initialize SHAP TreeExplainer for both models        """
         try:
             if self.classifier is not None:
                 self.classifier_explainer = shap.TreeExplainer(self.classifier)
@@ -123,11 +113,7 @@ class SHAPService:
         prediction: str
     ) -> Dict[str, Any]:
         """
-        Generate SHAP explanation for water quality classification
-        
-        Requirement 5.1: Compute SHAP values for each input feature within 1 second
-        Requirement 5.3: Rank features by absolute SHAP value
-        
+        Generate SHAP explanation for water quality classification        
         Args:
             sensor_data: Dictionary containing sensor readings
             prediction: The classification prediction (Safe, Warning, Unsafe)
@@ -209,11 +195,7 @@ class SHAPService:
         window_size: int = 10
     ) -> Dict[str, Any]:
         """
-        Generate SHAP explanation for contamination risk prediction
-        
-        Requirement 5.2: Compute SHAP values including temporal features
-        Requirement 5.3: Rank features by absolute SHAP value
-        
+        Generate SHAP explanation for contamination risk prediction        
         Args:
             current_reading: Dictionary containing current sensor readings
             historical_readings: List of historical sensor readings (optional)
@@ -307,10 +289,7 @@ class SHAPService:
         top_n: int = 5
     ) -> List[Dict[str, Any]]:
         """
-        Get top N features ranked by absolute SHAP value
-        
-        Requirement 5.3: Rank features by descending absolute SHAP value
-        
+        Get top N features ranked by absolute SHAP value        
         Args:
             shap_values: Dictionary of feature -> SHAP value
             top_n: Number of top features to return

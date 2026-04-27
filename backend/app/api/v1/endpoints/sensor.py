@@ -1,6 +1,6 @@
 """Sensor data ingestion endpoints for ESP32 sensor modules"""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from datetime import datetime
 from bson import ObjectId
@@ -22,6 +22,8 @@ from app.models.schemas import (
     ErrorResponse
 )
 from app.utils.logger import get_logger
+from app.config import settings
+from app.middleware import limiter
 from ml.ml_service import ml_service
 from ml.shap_service import shap_service
 
@@ -32,11 +34,7 @@ router = APIRouter(prefix="/sensor", tags=["Sensor Data"])
 
 def classify_risk_level(risk_score: float) -> RiskLevel:
     """
-    Classify risk level based on risk score
-    
-    Requirements: 4.6, 4.7, 4.8
-    
-    Args:
+    Classify risk level based on risk score    Args:
         risk_score: Risk score between 0.0 and 1.0
         
     Returns:
@@ -52,11 +50,7 @@ def classify_risk_level(risk_score: float) -> RiskLevel:
 
 def classify_tank_status(level_percent: float) -> TankStatus:
     """
-    Classify tank status based on level percentage
-    
-    Requirements: 2.3, 2.4, 2.5, 2.6
-    
-    Args:
+    Classify tank status based on level percentage    Args:
         level_percent: Tank level percentage (0-100)
         
     Returns:
@@ -74,11 +68,7 @@ def classify_tank_status(level_percent: float) -> TankStatus:
 
 def calculate_tank_volume(level_percent: float, tank_height_cm: float, tank_diameter_cm: float = 100.0) -> float:
     """
-    Calculate tank volume in liters based on level percentage
-    
-    Requirement: 2.7
-    
-    Assumes cylindrical tank: Volume = π * r² * h
+    Calculate tank volume in liters based on level percentage    Assumes cylindrical tank: Volume = π * r² * h
     
     Args:
         level_percent: Tank level percentage (0-100)
@@ -102,17 +92,22 @@ def calculate_tank_volume(level_percent: float, tank_height_cm: float, tank_diam
     responses={
         201: {"description": "Sensor data processed successfully"},
         400: {"model": ErrorResponse, "description": "Invalid sensor data"},
+        429: {"model": ErrorResponse, "description": "Rate limit exceeded"},
         500: {"model": ErrorResponse, "description": "Internal server error"}
     }
 )
+@limiter.limit(f"{settings.rate_limit_per_minute}/minute")
 async def ingest_sensor_data(
+    request: Request,
     sensor_data: SensorDataRequest,
     db: AsyncIOMotorDatabase = Depends(mongodb.get_database)
 ):
     """
     Ingest sensor data from ESP32 and perform ML inference
     
-    Requirements: 1.7, 3.1, 4.1, 5.1, 5.2, 11.1, 11.3
+    Requirements: 1.7, 3.1, 4.1, 5.1, 5.2, 11.1, 11.3, 17.7 (rate limiting)
+    
+    Rate limit: 100 requests per minute per IP address
     
     This endpoint:
     1. Validates sensor data using Pydantic model
@@ -122,6 +117,7 @@ async def ingest_sensor_data(
     5. Returns complete response with classification, risk, and SHAP values
     
     Args:
+        request: FastAPI request object (for rate limiting)
         sensor_data: SensorDataRequest payload from ESP32
         db: MongoDB database instance
         
@@ -129,6 +125,7 @@ async def ingest_sensor_data(
         SensorDataResponse with classification, risk prediction, and SHAP explanations
         
     Raises:
+        HTTPException: 429 if rate limit exceeded
         HTTPException: 500 if ML models are not loaded or processing fails
     """
     logger.info(
@@ -306,6 +303,98 @@ async def ingest_sensor_data(
             }
         )
         
+        # Step 7: Check for changes and send notifications (Requirements 8.1, 8.2, 8.3, 8.4)
+        try:
+            from app.services.notification_service import get_notification_service
+            notification_service = get_notification_service()
+            
+            if notification_service:
+                # Query previous reading for this device
+                previous_reading = await db.sensor_readings.find_one(
+                    {
+                        "device_id": sensor_data.device_id,
+                        "_id": {"$ne": result.inserted_id}
+                    },
+                    sort=[("timestamp", -1)]
+                )
+                
+                if previous_reading:
+                    # Get active user FCM tokens
+                    user_tokens = await notification_service.get_active_user_tokens(db)
+                    
+                    if user_tokens:
+                        # Check for water quality classification change (Requirement 8.1, 8.2, 8.3)
+                        previous_classification = previous_reading.get("classification")
+                        if previous_classification and previous_classification != quality_classification.value:
+                            logger.info(
+                                f"Water quality changed: {previous_classification} -> {quality_classification.value}",
+                                extra={
+                                    "extra_fields": {
+                                        "device_id": sensor_data.device_id,
+                                        "old_classification": previous_classification,
+                                        "new_classification": quality_classification.value
+                                    }
+                                }
+                            )
+                            
+                            # Get top contributing factor from SHAP explanation
+                            top_factor = classification_shap_factors[0].feature if classification_shap_factors else "unknown"
+                            
+                            # Send quality change notification
+                            await notification_service.send_quality_change_notification(
+                                user_tokens=user_tokens,
+                                old_quality=previous_classification,
+                                new_quality=quality_classification.value,
+                                top_factor=top_factor
+                            )
+                        
+                        # Check for contamination risk level increase (Requirement 8.4)
+                        previous_risk_level = previous_reading.get("risk_level")
+                        if previous_risk_level:
+                            # Define risk level ordering
+                            risk_order = {"Low": 0, "Medium": 1, "High": 2}
+                            previous_risk_order = risk_order.get(previous_risk_level, 0)
+                            current_risk_order = risk_order.get(risk_level.value, 0)
+                            
+                            # Only send notification if risk level increased
+                            if current_risk_order > previous_risk_order:
+                                logger.info(
+                                    f"Contamination risk increased: {previous_risk_level} -> {risk_level.value}",
+                                    extra={
+                                        "extra_fields": {
+                                            "device_id": sensor_data.device_id,
+                                            "old_risk_level": previous_risk_level,
+                                            "new_risk_level": risk_level.value,
+                                            "risk_score": risk_score
+                                        }
+                                    }
+                                )
+                                
+                                # Send risk change notification
+                                await notification_service.send_risk_change_notification(
+                                    user_tokens=user_tokens,
+                                    risk_level=risk_level.value,
+                                    risk_score=risk_score
+                                )
+                    else:
+                        logger.debug("No active user FCM tokens found for notifications")
+                else:
+                    logger.debug(f"No previous reading found for device {sensor_data.device_id}")
+            else:
+                logger.debug("Notification service not initialized, skipping notifications")
+        except Exception as e:
+            # Log error but don't fail the request
+            logger.error(
+                f"Error sending notifications: {str(e)}",
+                extra={
+                    "extra_fields": {
+                        "device_id": sensor_data.device_id,
+                        "error": str(e)
+                    }
+                },
+                exc_info=True
+            )
+        
         # Step 7: Build and return response
         response_timestamp = datetime.utcnow()
         
@@ -368,17 +457,22 @@ async def ingest_sensor_data(
     responses={
         201: {"description": "Tank level data processed successfully"},
         400: {"model": ErrorResponse, "description": "Invalid tank level data"},
+        429: {"model": ErrorResponse, "description": "Rate limit exceeded"},
         500: {"model": ErrorResponse, "description": "Internal server error"}
     }
 )
+@limiter.limit(f"{settings.rate_limit_per_minute}/minute")
 async def ingest_tank_level(
+    request: Request,
     tank_data: TankLevelRequest,
     db: AsyncIOMotorDatabase = Depends(mongodb.get_database)
 ):
     """
     Ingest tank level data from ESP32 ultrasonic sensor
     
-    Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 11.2
+    Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 11.2, 17.7 (rate limiting)
+    
+    Rate limit: 100 requests per minute per IP address
     
     This endpoint:
     1. Accepts TankLevelRequest payload from ESP32
@@ -388,6 +482,7 @@ async def ingest_tank_level(
     5. Returns tank status response
     
     Args:
+        request: FastAPI request object (for rate limiting)
         tank_data: TankLevelRequest payload from ESP32
         db: MongoDB database instance
         
@@ -396,6 +491,7 @@ async def ingest_tank_level(
         
     Raises:
         HTTPException: 400 if distance exceeds tank height
+        HTTPException: 429 if rate limit exceeded
         HTTPException: 500 if processing fails
     """
     logger.info(
@@ -500,6 +596,72 @@ async def ingest_tank_level(
                 }
             }
         )
+        
+        # Step 5: Check for tank status changes and send notifications (Requirements 9.1, 9.2, 9.3)
+        try:
+            from app.services.notification_service import get_notification_service
+            notification_service = get_notification_service()
+            
+            if notification_service:
+                # Query previous tank reading for this device
+                previous_reading = await db.tank_readings.find_one(
+                    {
+                        "device_id": tank_data.device_id,
+                        "_id": {"$ne": result.inserted_id}
+                    },
+                    sort=[("timestamp", -1)]
+                )
+                
+                if previous_reading:
+                    # Get active user FCM tokens
+                    user_tokens = await notification_service.get_active_user_tokens(db)
+                    
+                    if user_tokens:
+                        # Check for tank status change to critical states (Requirement 9.1, 9.2, 9.3)
+                        previous_tank_status = previous_reading.get("tank_status")
+                        
+                        # Only send notification if status changed AND new status is critical
+                        critical_statuses = ["Overflow", "Full", "Empty"]
+                        if (previous_tank_status and 
+                            previous_tank_status != tank_status.value and 
+                            tank_status.value in critical_statuses):
+                            
+                            logger.info(
+                                f"Tank status changed to critical state: {previous_tank_status} -> {tank_status.value}",
+                                extra={
+                                    "extra_fields": {
+                                        "device_id": tank_data.device_id,
+                                        "old_tank_status": previous_tank_status,
+                                        "new_tank_status": tank_status.value,
+                                        "level_percent": level_percent
+                                    }
+                                }
+                            )
+                            
+                            # Send tank status notification
+                            await notification_service.send_tank_notification(
+                                user_tokens=user_tokens,
+                                tank_status=tank_status.value,
+                                level_percent=level_percent
+                            )
+                    else:
+                        logger.debug("No active user FCM tokens found for notifications")
+                else:
+                    logger.debug(f"No previous tank reading found for device {tank_data.device_id}")
+            else:
+                logger.debug("Notification service not initialized, skipping notifications")
+        except Exception as e:
+            # Log error but don't fail the request
+            logger.error(
+                f"Error sending tank notifications: {str(e)}",
+                extra={
+                    "extra_fields": {
+                        "device_id": tank_data.device_id,
+                        "error": str(e)
+                    }
+                },
+                exc_info=True
+            )
         
         # Step 5: Build and return response
         response_timestamp = datetime.utcnow()

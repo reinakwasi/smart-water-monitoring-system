@@ -1,10 +1,7 @@
 """Data preparation module for ML model training
 
 This module handles loading training data, feature extraction, and train/test splitting
-for both the water quality classifier and contamination risk predictor.
-
-Requirements: 12.1
-"""
+for both the water quality classifier and contamination risk predictor."""
 
 import pandas as pd
 import numpy as np
@@ -21,10 +18,7 @@ class DataPreparator:
     - Loading CSV training data
     - Feature extraction for classification (5 sensor parameters)
     - Temporal feature extraction for risk prediction (current + mean/std/trend)
-    - Train/test split with stratification
-    
-    Requirement 12.1: Training pipeline that accepts labeled water quality datasets in CSV format
-    """
+    - Train/test split with stratification    """
     
     def __init__(self, random_state: int = 42):
         """
@@ -52,10 +46,7 @@ class DataPreparator:
     
     def load_csv_data(self, filepath: str) -> pd.DataFrame:
         """
-        Load training data from CSV file
-        
-        Requirement 12.1: Accept labeled water quality datasets in CSV format
-        
+        Load training data from CSV file        
         Args:
             filepath: Path to CSV file containing training data
             

@@ -110,10 +110,7 @@ class SensorDataRequest(BaseModel):
 
 class TankLevelRequest(BaseModel):
     """
-    Request model for tank level data from ESP32
-    
-    Requirements: 2.1, 15.2
-    """
+    Request model for tank level data from ESP32    """
     device_id: str = Field(..., min_length=1, max_length=100, description="Unique device identifier")
     timestamp: datetime = Field(..., description="Reading timestamp in ISO8601 format")
     distance_cm: float = Field(..., ge=0.0, le=500.0, description="Distance from sensor to water surface in cm")
@@ -160,10 +157,7 @@ class SHAPFactor(BaseModel):
 
 class SHAPExplanation(BaseModel):
     """
-    SHAP explanation for model predictions
-    
-    Requirements: 5.3, 5.4, 5.5
-    """
+    SHAP explanation for model predictions    """
     shap_values: Dict[str, float] = Field(..., description="SHAP values for all features")
     top_factors: List[SHAPFactor] = Field(..., description="Top contributing factors ranked by absolute SHAP value")
     
@@ -205,10 +199,7 @@ class SHAPExplanation(BaseModel):
 
 class ClassificationResult(BaseModel):
     """
-    Water quality classification result
-    
-    Requirements: 3.1, 3.2, 15.3
-    """
+    Water quality classification result    """
     quality: WaterQualityClassification = Field(..., description="Water quality classification")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Classification confidence score")
     shap_explanation: SHAPExplanation = Field(..., description="SHAP explanation for classification")
@@ -243,10 +234,7 @@ class ClassificationResult(BaseModel):
 
 class RiskPredictionResult(BaseModel):
     """
-    Contamination risk prediction result
-    
-    Requirements: 4.1, 4.2, 4.6, 4.7, 4.8, 15.4
-    """
+    Contamination risk prediction result    """
     risk_score: float = Field(..., ge=0.0, le=1.0, description="Risk score between 0.0 (no risk) and 1.0 (high risk)")
     risk_level: RiskLevel = Field(..., description="Risk level classification")
     shap_explanation: SHAPExplanation = Field(..., description="SHAP explanation for risk prediction")
@@ -281,10 +269,7 @@ class RiskPredictionResult(BaseModel):
 
 class SensorDataResponse(BaseModel):
     """
-    Complete response for sensor data ingestion
-    
-    Requirements: 1.7, 3.1, 4.1, 5.1, 15.3, 15.4, 15.5
-    """
+    Complete response for sensor data ingestion    """
     status: str = Field(..., description="Response status")
     reading_id: str = Field(..., description="MongoDB ObjectId of stored reading")
     classification: ClassificationResult = Field(..., description="Water quality classification")
@@ -322,10 +307,7 @@ class SensorDataResponse(BaseModel):
 
 class TankLevelResponse(BaseModel):
     """
-    Response for tank level data
-    
-    Requirements: 2.2, 2.3, 2.4, 2.5, 2.6, 2.7
-    """
+    Response for tank level data    """
     status: str = Field(..., description="Response status")
     reading_id: str = Field(..., description="MongoDB ObjectId of stored reading")
     tank_status: TankStatus = Field(..., description="Tank status classification")
@@ -378,10 +360,7 @@ class TankLevelStatus(BaseModel):
 
 class CurrentStatusResponse(BaseModel):
     """
-    Complete current status response
-    
-    Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7
-    """
+    Complete current status response    """
     water_quality: WaterQualityStatus = Field(..., description="Current water quality status")
     contamination_risk: ContaminationRiskStatus = Field(..., description="Current contamination risk")
     tank_status: TankLevelStatus = Field(..., description="Current tank level status")
@@ -402,10 +381,7 @@ class HistoricalDataPoint(BaseModel):
 
 class HistoricalDataResponse(BaseModel):
     """
-    Historical data response
-    
-    Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7
-    """
+    Historical data response    """
     data: List[HistoricalDataPoint] = Field(..., description="Historical data points")
     count: int = Field(..., ge=0, description="Number of data points returned")
     start_date: datetime = Field(..., description="Query start date")
@@ -502,10 +478,7 @@ class RiskThresholds(BaseModel):
 
 class SystemConfigResponse(BaseModel):
     """
-    System configuration response
-    
-    Requirements: 14.1, 14.2, 14.3, 14.4
-    """
+    System configuration response    """
     sensor_polling_interval_seconds: int = Field(..., ge=10, le=300, description="Sensor polling interval (10-300 seconds)")
     quality_thresholds: Dict[str, QualityThreshold] = Field(..., description="Water quality thresholds per parameter")
     risk_thresholds: RiskThresholds = Field(..., description="Contamination risk thresholds")
@@ -557,10 +530,7 @@ class SystemConfigResponse(BaseModel):
 
 class SystemConfigUpdateRequest(BaseModel):
     """
-    System configuration update request
-    
-    Requirements: 14.1, 14.2, 14.3, 14.4, 14.5, 14.6
-    """
+    System configuration update request    """
     sensor_polling_interval_seconds: Optional[int] = Field(None, ge=10, le=300, description="Sensor polling interval (10-300 seconds)")
     quality_thresholds: Optional[Dict[str, QualityThreshold]] = Field(None, description="Water quality thresholds per parameter")
     risk_thresholds: Optional[RiskThresholds] = Field(None, description="Contamination risk thresholds")
@@ -624,10 +594,7 @@ class SensorType(str, Enum):
 
 class CalibrationRequest(BaseModel):
     """
-    Sensor calibration request
-    
-    Requirements: 13.1, 13.2, 13.3, 13.6
-    """
+    Sensor calibration request    """
     device_id: str = Field(..., min_length=1, max_length=100, description="Device identifier")
     sensor_type: SensorType = Field(..., description="Type of sensor to calibrate")
     reference_value: float = Field(..., description="Known reference value")
@@ -684,6 +651,92 @@ class ErrorResponse(BaseModel):
                 "message": "Invalid sensor data",
                 "detail": "pH value must be between 0 and 14",
                 "timestamp": "2025-01-15T10:30:00Z"
+            }
+        }
+    )
+
+
+# ============================================================================
+# Health Check Models
+# ============================================================================
+
+class SystemHealthStatus(str, Enum):
+    """Overall system health status"""
+    HEALTHY = "healthy"
+    DEGRADED = "degraded"
+    UNHEALTHY = "unhealthy"
+
+
+class ComponentHealth(BaseModel):
+    """
+    Health status for a system component    """
+    status: str = Field(..., description="Component status (connected, disconnected, loaded, not_loaded, operational, degraded, not_initialized)")
+    latency_ms: Optional[float] = Field(None, description="Component latency in milliseconds (for database)")
+    classifier_version: Optional[str] = Field(None, description="Classifier model version (for ML models)")
+    predictor_version: Optional[str] = Field(None, description="Risk predictor model version (for ML models)")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "status": "connected",
+                "latency_ms": 15.5
+            }
+        }
+    )
+
+
+class SensorDeviceHealth(BaseModel):
+    """
+    Health status for a sensor device    """
+    device_id: str = Field(..., description="Sensor device ID")
+    status: str = Field(..., description="Device status (online, offline)")
+    last_communication: Optional[datetime] = Field(None, description="Timestamp of last communication")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "device_id": "ESP32_001",
+                "status": "online",
+                "last_communication": "2025-01-15T10:30:00Z"
+            }
+        }
+    )
+
+
+class HealthCheckResponse(BaseModel):
+    """
+    System health check response    """
+    status: SystemHealthStatus = Field(..., description="Overall system health status")
+    timestamp: datetime = Field(..., description="Health check timestamp")
+    components: Dict[str, ComponentHealth] = Field(..., description="Health status of system components")
+    sensors: List[SensorDeviceHealth] = Field(default_factory=list, description="Health status of sensor devices")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "status": "healthy",
+                "timestamp": "2025-01-15T10:30:00Z",
+                "components": {
+                    "database": {
+                        "status": "connected",
+                        "latency_ms": 15.5
+                    },
+                    "ml_models": {
+                        "status": "loaded",
+                        "classifier_version": "v1.0",
+                        "predictor_version": "v1.0"
+                    },
+                    "notification_service": {
+                        "status": "operational"
+                    }
+                },
+                "sensors": [
+                    {
+                        "device_id": "ESP32_001",
+                        "status": "online",
+                        "last_communication": "2025-01-15T10:30:00Z"
+                    }
+                ]
             }
         }
     )
