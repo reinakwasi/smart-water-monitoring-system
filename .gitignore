@@ -67,3 +67,6 @@ logs/
 
 # Node modules (for future frontend)
 node_modules/
+
+# Kiro AI assistant files (remove before submission)
+.kiro/

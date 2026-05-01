@@ -33,14 +33,16 @@ class NotificationService:
     
     async def send_quality_change_notification(
         self,
-        user_tokens: List[str],
+        user_tokens: List[Tuple[str, Dict]],  # Changed to include user preferences
         old_quality: str,
         new_quality: str,
         top_factor: str
     ) -> bool:
         """
-        Send notification when water quality classification changes        Args:
-            user_tokens: List of FCM device tokens
+        Send notification when water quality classification changes
+        
+        Args:
+            user_tokens: List of tuples (FCM token, user preferences dict)
             old_quality: Previous water quality classification
             new_quality: New water quality classification
             top_factor: Top contributing factor from SHAP analysis
@@ -48,6 +50,16 @@ class NotificationService:
         Returns:
             bool: True if notification sent successfully, False otherwise
         """
+        # Filter users based on preferences (Chapter 3 Algorithm 5)
+        filtered_tokens = [
+            token for token, prefs in user_tokens
+            if prefs.get('alert_on_unsafe', True) and prefs.get('push_enabled', True)
+        ]
+        
+        if not filtered_tokens:
+            logger.info("No users with quality alert preferences enabled")
+            return False
+        
         notification_key = f"quality_{new_quality}"
         
         # Check throttling (Requirement 8.7)
@@ -72,7 +84,7 @@ class NotificationService:
         
         # Send notification with retry logic
         success = await self._send_fcm_notification_with_retry(
-            user_tokens, title, body, priority, notification_type="quality_change"
+            filtered_tokens, title, body, priority, notification_type="quality_change"
         )
         
         if success:
@@ -95,22 +107,32 @@ class NotificationService:
     
     async def send_risk_change_notification(
         self,
-        user_tokens: List[str],
+        user_tokens: List[Tuple[str, Dict]],
         risk_level: str,
         risk_score: float
     ) -> bool:
         """
         Send notification when contamination risk level increases        Args:
-            user_tokens: List of FCM device tokens
+            user_tokens: List of tuples (FCM token, user preferences dict)
             risk_level: Risk level (Low, Medium, High)
             risk_score: Risk score (0.0 - 1.0)
             
         Returns:
             bool: True if notification sent successfully, False otherwise
         """
+        # Filter users based on preferences
+        filtered_tokens = [
+            token for token, prefs in user_tokens
+            if prefs.get('alert_on_high_risk', True) and prefs.get('push_enabled', True)
+        ]
+        
+        if not filtered_tokens:
+            logger.info("No users with high risk alert preferences enabled")
+            return False
+        
         notification_key = f"risk_{risk_level}"
         
-        # Check throttling (Requirement 8.7)
+        # Check throttling
         if self._should_throttle(notification_key):
             logger.info(
                 f"Risk change notification throttled for {risk_level}",
@@ -130,11 +152,11 @@ class NotificationService:
         
         # Send notification with retry logic
         success = await self._send_fcm_notification_with_retry(
-            user_tokens, title, body, "normal", notification_type="risk_change"
+            filtered_tokens, title, body, "normal", notification_type="risk_change"
         )
         
         if success:
-            # Update throttle cache (Requirement 8.7)
+            # Update throttle cache
             self._update_throttle_cache(notification_key)
             logger.info(
                 f"Risk change notification sent successfully: {risk_level} ({risk_score:.2f})",
@@ -151,22 +173,32 @@ class NotificationService:
     
     async def send_tank_notification(
         self,
-        user_tokens: List[str],
+        user_tokens: List[Tuple[str, Dict]],
         tank_status: str,
         level_percent: float
     ) -> bool:
         """
         Send notification for tank level changes        Args:
-            user_tokens: List of FCM device tokens
-            tank_status: Tank status (Empty, Half_Full, Full, Overflow)
+            user_tokens: List of tuples (FCM token, user preferences dict)
+            tank_status: Tank status (Empty, Low, Half_Full, Full, Overflow)
             level_percent: Tank level percentage
             
         Returns:
             bool: True if notification sent successfully, False otherwise
         """
+        # Filter users based on preferences
+        filtered_tokens = [
+            token for token, prefs in user_tokens
+            if prefs.get('alert_on_tank_critical', True) and prefs.get('push_enabled', True)
+        ]
+        
+        if not filtered_tokens:
+            logger.info("No users with tank critical alert preferences enabled")
+            return False
+        
         notification_key = f"tank_{tank_status}"
         
-        # Check throttling (Requirement 9.6)
+        # Check throttling
         if self._should_throttle(notification_key):
             logger.info(
                 f"Tank notification throttled for {tank_status}",
@@ -180,19 +212,19 @@ class NotificationService:
             )
             return False
         
-        # Determine priority based on tank status (Requirement 9.1)
+        # Determine priority based on tank status
         priority = "high" if tank_status == "Overflow" else "normal"
         
-        # Format notification message (Requirement 9.4, 9.5)
+        # Format notification message
         title, body = self._format_tank_message(tank_status, level_percent)
         
         # Send notification with retry logic
         success = await self._send_fcm_notification_with_retry(
-            user_tokens, title, body, priority, notification_type="tank_status"
+            filtered_tokens, title, body, priority, notification_type="tank_status"
         )
         
         if success:
-            # Update throttle cache (Requirement 9.6)
+            # Update throttle cache
             self._update_throttle_cache(notification_key)
             logger.info(
                 f"Tank notification sent successfully: {tank_status} ({level_percent:.1f}%)",
@@ -429,15 +461,15 @@ class NotificationService:
         }
         return messages.get(new, ("Water Quality Update", f"Status changed to {new}"))
     
-    async def get_active_user_tokens(self, db: AsyncIOMotorDatabase) -> List[str]:
+    async def get_active_user_tokens(self, db: AsyncIOMotorDatabase) -> List[Tuple[str, Dict]]:
         """
-        Get FCM tokens for all active users
+        Get FCM tokens and preferences for all active users
         
         Args:
             db: MongoDB database instance
             
         Returns:
-            List of FCM tokens for active users
+            List of tuples (FCM token, preferences dict) for active users
         """
         try:
             cursor = db.users.find(
@@ -445,16 +477,28 @@ class NotificationService:
                     "is_active": True,
                     "fcm_token": {"$ne": None, "$exists": True}
                 },
-                {"fcm_token": 1}
+                {
+                    "fcm_token": 1,
+                    "alert_on_unsafe": 1,
+                    "alert_on_high_risk": 1,
+                    "alert_on_tank_critical": 1,
+                    "push_enabled": 1
+                }
             )
             
-            tokens = []
+            tokens_with_prefs = []
             async for user in cursor:
                 if user.get("fcm_token"):
-                    tokens.append(user["fcm_token"])
+                    prefs = {
+                        "alert_on_unsafe": user.get("alert_on_unsafe", True),
+                        "alert_on_high_risk": user.get("alert_on_high_risk", True),
+                        "alert_on_tank_critical": user.get("alert_on_tank_critical", True),
+                        "push_enabled": user.get("push_enabled", True)
+                    }
+                    tokens_with_prefs.append((user["fcm_token"], prefs))
             
-            logger.debug(f"Found {len(tokens)} active user FCM tokens")
-            return tokens
+            logger.debug(f"Found {len(tokens_with_prefs)} active user FCM tokens with preferences")
+            return tokens_with_prefs
             
         except Exception as e:
             logger.error(f"Error retrieving user FCM tokens: {str(e)}", exc_info=True)

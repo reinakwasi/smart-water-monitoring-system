@@ -27,6 +27,7 @@ class RiskLevel(str, Enum):
 class TankStatus(str, Enum):
     """Tank level status categories"""
     EMPTY = "Empty"
+    LOW = "Low"
     HALF_FULL = "Half_Full"
     FULL = "Full"
     OVERFLOW = "Overflow"

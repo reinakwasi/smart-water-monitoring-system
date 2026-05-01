@@ -164,25 +164,30 @@ async def test_tank_level_endpoint_structure():
 
 @pytest.mark.asyncio
 async def test_tank_level_classification():
-    """Test tank status classification logic"""
+    """Test tank status classification logic (Chapter 3 Algorithm 4)"""
     from app.api.v1.endpoints.sensor import classify_tank_status, TankStatus
     
-    # Test Empty (< 10%)
+    # Test Empty (<= 5%)
+    assert classify_tank_status(0.0) == TankStatus.EMPTY
     assert classify_tank_status(5.0) == TankStatus.EMPTY
-    assert classify_tank_status(9.9) == TankStatus.EMPTY
     
-    # Test Half_Full (10% <= level < 50%)
-    assert classify_tank_status(10.0) == TankStatus.HALF_FULL
-    assert classify_tank_status(30.0) == TankStatus.HALF_FULL
-    assert classify_tank_status(49.9) == TankStatus.HALF_FULL
+    # Test Low (5% < level <= 25%)
+    assert classify_tank_status(6.0) == TankStatus.LOW
+    assert classify_tank_status(15.0) == TankStatus.LOW
+    assert classify_tank_status(25.0) == TankStatus.LOW
     
-    # Test Full (50% <= level < 95%)
-    assert classify_tank_status(50.0) == TankStatus.FULL
-    assert classify_tank_status(75.0) == TankStatus.FULL
-    assert classify_tank_status(94.9) == TankStatus.FULL
+    # Test Half_Full (25% < level <= 75%)
+    assert classify_tank_status(26.0) == TankStatus.HALF_FULL
+    assert classify_tank_status(50.0) == TankStatus.HALF_FULL
+    assert classify_tank_status(75.0) == TankStatus.HALF_FULL
     
-    # Test Overflow (>= 95%)
-    assert classify_tank_status(95.0) == TankStatus.OVERFLOW
+    # Test Full (75% < level <= 95%)
+    assert classify_tank_status(76.0) == TankStatus.FULL
+    assert classify_tank_status(90.0) == TankStatus.FULL
+    assert classify_tank_status(95.0) == TankStatus.FULL
+    
+    # Test Overflow (> 95%)
+    assert classify_tank_status(96.0) == TankStatus.OVERFLOW
     assert classify_tank_status(100.0) == TankStatus.OVERFLOW
 
 

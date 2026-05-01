@@ -50,18 +50,29 @@ def classify_risk_level(risk_score: float) -> RiskLevel:
 
 def classify_tank_status(level_percent: float) -> TankStatus:
     """
-    Classify tank status based on level percentage    Args:
+    Classify tank status based on level percentage
+    
+    Thresholds match Chapter 3 Algorithm 4:
+    - Empty: <= 5%
+    - Low: > 5% and <= 25%
+    - Half: > 25% and <= 75%
+    - Full: > 75% and <= 95%
+    - Overflow: > 95%
+    
+    Args:
         level_percent: Tank level percentage (0-100)
         
     Returns:
-        TankStatus enum (Empty, Half_Full, Full, Overflow)
+        TankStatus enum (Empty, Low, Half_Full, Full, Overflow)
     """
-    if level_percent >= 95.0:
+    if level_percent > 95.0:
         return TankStatus.OVERFLOW
-    elif level_percent >= 50.0:
+    elif level_percent > 75.0:
         return TankStatus.FULL
-    elif level_percent >= 10.0:
+    elif level_percent > 25.0:
         return TankStatus.HALF_FULL
+    elif level_percent > 5.0:
+        return TankStatus.LOW
     else:
         return TankStatus.EMPTY
 

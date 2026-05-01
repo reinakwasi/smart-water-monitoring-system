@@ -378,12 +378,54 @@ The implementation follows an incremental approach where each task builds on pre
 
 ### Phase 5: React Native Mobile Application
 
-- [ ] 21. Set up React Native project
-  - Initialize React Native project with TypeScript
-  - Install dependencies (React Navigation, Victory Native, Firebase, Axios, AsyncStorage)
-  - Configure Firebase Cloud Messaging for push notifications
-  - Set up project structure (screens, components, services, context)
-  - _Requirements: 6.1_
+- [ ] 21. Set up React Native project and Android Studio environment
+  - [ ] 21.1 Install and configure Android Studio
+    - Install Android Studio (latest stable version)
+    - Install Android SDK (API levels 30, 31, 33)
+    - Install Android SDK Build-Tools, Platform-Tools, and Emulator
+    - Set up ANDROID_HOME environment variable
+    - Create Android Virtual Device (AVD) - Pixel 5 or Pixel 6 with Android 13
+    - _Requirements: 6.1_
+  
+  - [ ] 21.2 Install Node.js and React Native CLI
+    - Install Node.js LTS version (18.x or 20.x)
+    - Install React Native CLI globally: `npm install -g react-native-cli`
+    - Install Java Development Kit (JDK 11 or 17)
+    - Set up JAVA_HOME environment variable
+    - Verify installations with version checks
+    - _Requirements: 6.1_
+  
+  - [ ] 21.3 Create React Native project
+    - Initialize React Native project: `npx react-native init WaterQualityMonitor`
+    - Open android folder in Android Studio
+    - Test project runs on emulator: `npm run android`
+    - Set up project structure (src/screens, src/components, src/services, src/navigation, src/utils)
+    - _Requirements: 6.1_
+  
+  - [ ] 21.4 Install core dependencies
+    - Navigation: `@react-navigation/native`, `@react-navigation/stack`, `react-native-screens`, `react-native-safe-area-context`
+    - API calls: `axios`
+    - Charts: `react-native-chart-kit`, `react-native-svg`
+    - Push notifications: `@react-native-firebase/app`, `@react-native-firebase/messaging`
+    - Icons: `react-native-vector-icons`
+    - Date/Time: `moment`
+    - State management (optional): `@reduxjs/toolkit`, `react-redux`
+    - _Requirements: 6.1_
+  
+  - [ ] 21.5 Configure Firebase Cloud Messaging
+    - Create Firebase project in Firebase Console
+    - Download google-services.json and place in android/app/
+    - Configure Firebase in android/build.gradle and android/app/build.gradle
+    - Request notification permissions
+    - Test FCM token generation
+    - _Requirements: 8.1, 9.1_
+  
+  - [ ] 21.6 Set up API service configuration
+    - Create src/services/api.js with backend base URL
+    - Configure Axios instance with interceptors for JWT tokens
+    - Create API methods for all backend endpoints
+    - Test API connection to backend
+    - _Requirements: 6.1, 17.4_
 
 - [ ] 22. Implement authentication screens
   - [ ] 22.1 Create login screen

@@ -114,6 +114,12 @@ class UserDocument(BaseModel):
     # FCM token for push notifications
     fcm_token: Optional[str] = None
     
+    # Notification preferences
+    alert_on_unsafe: bool = True  # Alert when water quality is Unsafe
+    alert_on_high_risk: bool = True  # Alert when contamination risk is High
+    alert_on_tank_critical: bool = True  # Alert on Empty/Overflow tank status
+    push_enabled: bool = True  # Enable/disable push notifications
+    
     # Metadata
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -144,6 +150,8 @@ class SensorDeviceDocument(BaseModel):
     Collection: sensor_devices    """
     device_id: str
     device_name: str
+    location: Optional[str] = None  # Physical location of device
+    ip_address: Optional[str] = None  # Device IP address
     
     # Calibration offsets
     calibration: Dict[str, float] = Field(
@@ -293,6 +301,7 @@ class NotificationLogDocument(BaseModel):
     sent_at: datetime = Field(default_factory=datetime.utcnow)
     delivery_status: str = "sent"  # sent, failed, delivered
     fcm_response: Optional[Dict] = None
+    is_read: bool = False  # Whether user has read the notification
     
     # Related data
     related_reading_id: Optional[str] = None
