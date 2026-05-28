@@ -7,21 +7,12 @@ import {
   Dimensions,
   TouchableOpacity,
   FlatList,
-  NativeSyntheticEvent,
-  NativeScrollEvent,
   Animated,
 } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 
-interface OnboardingItem {
-  id: string;
-  image: any;
-  title: string;
-  description: string;
-}
-
-const onboardingData: OnboardingItem[] = [
+const onboardingData = [
   {
     id: '1',
     image: require('../assets/onboarding1.png'),
@@ -42,13 +33,9 @@ const onboardingData: OnboardingItem[] = [
   },
 ];
 
-interface OnboardingScreenProps {
-  onFinish: () => void;
-}
-
-const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish }) => {
+const OnboardingScreen = ({ onFinish }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const flatListRef = useRef<FlatList>(null);
+  const flatListRef = useRef(null);
   
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -104,7 +91,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish }) => {
     ]).start();
   }, [currentIndex]);
 
-  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+  const handleScroll = (event) => {
     const index = Math.round(event.nativeEvent.contentOffset.x / width);
     setCurrentIndex(index);
   };
@@ -138,7 +125,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish }) => {
     onFinish();
   };
 
-  const renderItem = ({ item }: { item: OnboardingItem }) => (
+  const renderItem = ({ item }) => (
     <View style={styles.slide}>
       <Image source={item.image} style={styles.backgroundImage} resizeMode="cover" />
       

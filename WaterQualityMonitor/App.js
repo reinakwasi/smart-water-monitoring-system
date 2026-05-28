@@ -101,7 +101,7 @@ function AppContent() {
   return (
     <View style={styles.container}>
       <NewAppScreen
-        templateFileName="App.tsx"
+        templateFileName="App.js"
         safeAreaInsets={safeAreaInsets}
       />
     </View>
