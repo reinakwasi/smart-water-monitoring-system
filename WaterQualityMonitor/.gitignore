@@ -35,6 +35,10 @@ local.properties
 !debug.keystore
 .kotlin/
 
+# Firebase Config Files (SENSITIVE - DO NOT COMMIT)
+android/app/google-services.json
+ios/GoogleService-Info.plist
+
 # node.js
 #
 node_modules/
