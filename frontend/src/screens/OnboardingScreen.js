@@ -37,12 +37,12 @@ const OnboardingScreen = ({ onFinish }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef(null);
   
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(50)).current;
-  const titleAnim = useRef(new Animated.Value(0)).current;
-  const underlineAnim = useRef(new Animated.Value(0)).current;
-  const descAnim = useRef(new Animated.Value(0)).current;
-  const buttonAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const titleAnim = useRef(new Animated.Value(1)).current;
+  const underlineAnim = useRef(new Animated.Value(1)).current;
+  const descAnim = useRef(new Animated.Value(1)).current;
+  const buttonAnim = useRef(new Animated.Value(1)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
