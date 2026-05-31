@@ -64,12 +64,33 @@ export const authAPI = {
     return response.data;
   },
 
+  verifyOTP: async (data) => {
+    const response = await apiClient.post('/api/v1/auth/verify-otp', null, {
+      params: data
+    });
+    return response.data;
+  },
+
+  resendOTP: async (data) => {
+    const response = await apiClient.post('/api/v1/auth/resend-otp', null, {
+      params: data
+    });
+    return response.data;
+  },
+
   login: async (data) => {
     const response = await apiClient.post('/api/v1/auth/login', data);
-    const { access_token, refresh_token } = response.data;
+    const { access_token, refresh_token, user } = response.data;
     
-    await AsyncStorage.setItem(TOKEN_KEY, access_token);
-    await AsyncStorage.setItem(REFRESH_TOKEN_KEY, refresh_token);
+    // Store access token
+    if (access_token) {
+      await AsyncStorage.setItem(TOKEN_KEY, access_token);
+    }
+    
+    // Store refresh token only if it exists
+    if (refresh_token) {
+      await AsyncStorage.setItem(REFRESH_TOKEN_KEY, refresh_token);
+    }
     
     return response.data;
   },

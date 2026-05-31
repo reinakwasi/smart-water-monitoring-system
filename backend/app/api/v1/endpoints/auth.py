@@ -14,6 +14,7 @@ from app.models.schemas import (
     ErrorResponse
 )
 from app.services.auth_service import auth_service
+from app.services.email_service import email_service
 from app.dependencies import get_current_user
 from app.utils.logger import get_logger
 
@@ -69,7 +70,7 @@ async def register_user(
     # Hash password
     password_hash = auth_service.hash_password(user_data.password)
     
-    # Create user document
+    # Create user document with is_verified=False
     user_doc = {
         "email": user_data.email,
         "password_hash": password_hash,
@@ -79,15 +80,32 @@ async def register_user(
         "created_at": datetime.utcnow(),
         "updated_at": datetime.utcnow(),
         "last_login": None,
-        "is_active": True
+        "is_active": False,
+        "is_verified": False
     }
     
     # Insert user into database
     result = await db.users.insert_one(user_doc)
     user_id = str(result.inserted_id)
     
+    # Generate and send OTP
+    otp = email_service.generate_otp()
+    email_service.store_otp(user_data.email, otp)
+    
+    # Send OTP email
+    email_sent = email_service.send_otp_email(user_data.email, otp)
+    
+    if not email_sent:
+        logger.error(f"Failed to send OTP email to {user_data.email}")
+        # Delete the user if email fails
+        await db.users.delete_one({"_id": result.inserted_id})
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send verification email. Please try again."
+        )
+    
     logger.info(
-        f"User registered successfully: {user_data.email}",
+        f"User registered successfully (pending verification): {user_data.email}",
         extra={"extra_fields": {"user_id": user_id, "role": user_data.role}}
     )
     
@@ -152,12 +170,20 @@ async def login_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Check if user is active
-    if not user.get("is_active", True):
+    # Check if user is active and verified
+    if not user.get("is_active", False):
         logger.warning(f"Login failed: Inactive account for email {login_data.email}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User account is inactive",
+            detail="Please verify your email before signing in",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    if not user.get("is_verified", False):
+        logger.warning(f"Login failed: Unverified account for email {login_data.email}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Please verify your email before signing in",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
@@ -247,3 +273,123 @@ async def refresh_token(
             created_at=current_user["created_at"]
         )
     )
+
+
+@router.post(
+    "/verify-otp",
+    status_code=status.HTTP_200_OK,
+    responses={
+        200: {"description": "OTP verified successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid or expired OTP"}
+    }
+)
+async def verify_otp(
+    email: str,
+    otp: str,
+    db: AsyncIOMotorDatabase = Depends(mongodb.get_database)
+):
+    """
+    Verify OTP code and activate user account
+    
+    Args:
+        email: User's email address
+        otp: 6-digit OTP code
+        db: MongoDB database instance
+        
+    Returns:
+        Success message
+        
+    Raises:
+        HTTPException: 400 if OTP is invalid or expired
+    """
+    logger.info(f"OTP verification attempt for email: {email}")
+    
+    # Verify OTP
+    if not email_service.verify_otp(email, otp):
+        logger.warning(f"OTP verification failed for {email}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired OTP code"
+        )
+    
+    # Update user as verified and activate account
+    result = await db.users.update_one(
+        {"email": email},
+        {"$set": {
+            "is_verified": True, 
+            "is_active": True,
+            "updated_at": datetime.utcnow()
+        }}
+    )
+    
+    if result.modified_count == 0:
+        logger.warning(f"User not found for email: {email}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Get user details
+    user = await db.users.find_one({"email": email})
+    
+    # Send welcome email
+    email_service.send_welcome_email(email, user["full_name"])
+    
+    logger.info(f"OTP verified successfully for {email}")
+    
+    return {"message": "Email verified successfully", "email": email}
+
+
+@router.post(
+    "/resend-otp",
+    status_code=status.HTTP_200_OK,
+    responses={
+        200: {"description": "OTP resent successfully"},
+        404: {"model": ErrorResponse, "description": "User not found"}
+    }
+)
+async def resend_otp(
+    email: str,
+    db: AsyncIOMotorDatabase = Depends(mongodb.get_database)
+):
+    """
+    Resend OTP code to user's email
+    
+    Args:
+        email: User's email address
+        db: MongoDB database instance
+        
+    Returns:
+        Success message
+        
+    Raises:
+        HTTPException: 404 if user not found
+    """
+    logger.info(f"OTP resend request for email: {email}")
+    
+    # Check if user exists
+    user = await db.users.find_one({"email": email})
+    if not user:
+        logger.warning(f"User not found for email: {email}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Generate and send new OTP
+    otp = email_service.generate_otp()
+    email_service.store_otp(email, otp)
+    
+    # Send OTP email
+    email_sent = email_service.send_otp_email(email, otp)
+    
+    if not email_sent:
+        logger.error(f"Failed to send OTP email to {email}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send OTP email"
+        )
+    
+    logger.info(f"OTP resent successfully to {email}")
+    
+    return {"message": "OTP sent successfully", "email": email}

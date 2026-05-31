@@ -5,6 +5,11 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from slowapi.errors import RateLimitExceeded
 from contextlib import asynccontextmanager
 import logging
+import warnings
+
+# Suppress sklearn version warnings
+warnings.filterwarnings('ignore', category=UserWarning, module='sklearn')
+warnings.filterwarnings('ignore', message='.*InconsistentVersionWarning.*')
 
 from app.config import settings
 from app.utils.logger import setup_logging, get_logger

@@ -1,13 +1,11 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
   Image,
-  StyleSheet,
   Dimensions,
   TouchableOpacity,
   FlatList,
-  Animated,
 } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
@@ -36,60 +34,6 @@ const onboardingData = [
 const OnboardingScreen = ({ onFinish }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef(null);
-  
-  const fadeAnim = useRef(new Animated.Value(1)).current;
-  const slideAnim = useRef(new Animated.Value(0)).current;
-  const titleAnim = useRef(new Animated.Value(1)).current;
-  const underlineAnim = useRef(new Animated.Value(1)).current;
-  const descAnim = useRef(new Animated.Value(1)).current;
-  const buttonAnim = useRef(new Animated.Value(1)).current;
-  const buttonScale = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    fadeAnim.setValue(0);
-    slideAnim.setValue(50);
-    titleAnim.setValue(0);
-    underlineAnim.setValue(0);
-    descAnim.setValue(0);
-    buttonAnim.setValue(0);
-
-    Animated.sequence([
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-      ]),
-      Animated.stagger(150, [
-        Animated.timing(titleAnim, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-        Animated.timing(underlineAnim, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-        Animated.timing(descAnim, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-        Animated.timing(buttonAnim, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-      ]),
-    ]).start();
-  }, [currentIndex]);
 
   const handleScroll = (event) => {
     const index = Math.round(event.nativeEvent.contentOffset.x / width);
@@ -97,20 +41,6 @@ const OnboardingScreen = ({ onFinish }) => {
   };
 
   const handleNext = () => {
-    const scale = buttonScale;
-    Animated.sequence([
-      Animated.timing(scale, {
-        toValue: 0.95,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scale, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
     if (currentIndex < onboardingData.length - 1) {
       flatListRef.current?.scrollToIndex({
         index: currentIndex + 1,
@@ -126,75 +56,21 @@ const OnboardingScreen = ({ onFinish }) => {
   };
 
   const renderItem = ({ item }) => (
-    <View style={styles.slide}>
-      <Image source={item.image} style={styles.backgroundImage} resizeMode="cover" />
+    <View style={{ width, height }}>
+      <Image source={item.image} style={{ width, height, position: 'absolute' }} resizeMode="cover" />
       
-      <View style={styles.overlay} />
+      <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: height * 0.4, backgroundColor: 'rgba(0,0,0,0.85)' }} />
 
-      <Animated.View 
-        style={[
-          styles.contentContainer,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-          },
-        ]}
-      >
-        <Animated.Text 
-          style={[
-            styles.title,
-            {
-              opacity: titleAnim,
-              transform: [
-                {
-                  translateY: titleAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [20, 0],
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          {item.title}
-        </Animated.Text>
-        <Animated.View 
-          style={[
-            styles.underline,
-            {
-              opacity: underlineAnim,
-              transform: [
-                {
-                  scaleX: underlineAnim,
-                },
-              ],
-            },
-          ]} 
-        />
-        <Animated.Text 
-          style={[
-            styles.description,
-            {
-              opacity: descAnim,
-              transform: [
-                {
-                  translateY: descAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [20, 0],
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          {item.description}
-        </Animated.Text>
-      </Animated.View>
+      <View style={{ position: 'absolute', bottom: 200, left: 30, right: 30 }}>
+        <Text className="text-3xl font-bold text-white mb-2 leading-10">{item.title}</Text>
+        <View className="w-16 h-1 bg-cyan-400 mb-5" />
+        <Text className="text-base text-blue-300 leading-6">{item.description}</Text>
+      </View>
     </View>
   );
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1 bg-black">
       <FlatList
         ref={flatListRef}
         data={onboardingData}
@@ -207,18 +83,11 @@ const OnboardingScreen = ({ onFinish }) => {
         keyExtractor={(item) => item.id}
       />
 
-      <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
-        <Text style={styles.skipText}>Skip</Text>
+      <TouchableOpacity className="absolute top-12 right-8 p-2" onPress={handleSkip}>
+        <Text className="text-base text-cyan-400 font-semibold">Skip</Text>
       </TouchableOpacity>
 
-      <Animated.View 
-        style={[
-          styles.dotsContainer,
-          {
-            opacity: buttonAnim,
-          },
-        ]}
-      >
+      <View className="absolute bottom-32 flex-row self-center">
         {onboardingData.map((_, index) => (
           <TouchableOpacity
             key={index}
@@ -229,139 +98,20 @@ const OnboardingScreen = ({ onFinish }) => {
               });
             }}>
             <View
-              style={[
-                styles.dot,
-                currentIndex === index ? styles.activeDot : styles.inactiveDot,
-              ]}
+              className={`h-2.5 rounded-full mx-1.5 ${currentIndex === index ? 'w-8 bg-cyan-400' : 'w-2.5 bg-gray-600'}`}
             />
           </TouchableOpacity>
         ))}
-      </Animated.View>
+      </View>
 
-      <Animated.View
-        style={{
-          opacity: buttonAnim,
-          transform: [
-            { scale: buttonScale },
-            {
-              translateY: buttonAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [30, 0],
-              }),
-            },
-          ],
-        }}
-      >
-        <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-          <Text style={styles.nextButtonText}>
-            {currentIndex === onboardingData.length - 1 ? 'Get Started' : 'Next'}
-          </Text>
-          <Text style={styles.arrow}>›</Text>
-        </TouchableOpacity>
-      </Animated.View>
+      <TouchableOpacity className="absolute bottom-12 left-8 right-8 bg-cyan-400 py-4 rounded-full flex-row items-center justify-center" onPress={handleNext}>
+        <Text className="text-lg text-white font-bold mr-2">
+          {currentIndex === onboardingData.length - 1 ? 'Get Started' : 'Next'}
+        </Text>
+        <Text className="text-2xl text-white font-bold">›</Text>
+      </TouchableOpacity>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000000',
-  },
-  slide: {
-    width: width,
-    height: height,
-  },
-  backgroundImage: {
-    width: width,
-    height: height,
-    position: 'absolute',
-  },
-  overlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: height * 0.4,
-    backgroundColor: 'rgba(0,0,0,0.85)',
-  },
-  contentContainer: {
-    position: 'absolute',
-    bottom: 200,
-    left: 30,
-    right: 30,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 8,
-    lineHeight: 40,
-  },
-  underline: {
-    width: 60,
-    height: 4,
-    backgroundColor: '#00BCD4',
-    marginBottom: 20,
-  },
-  description: {
-    fontSize: 16,
-    color: '#8B9DC3',
-    lineHeight: 24,
-  },
-  skipButton: {
-    position: 'absolute',
-    top: 50,
-    right: 30,
-    padding: 10,
-  },
-  skipText: {
-    fontSize: 16,
-    color: '#00BCD4',
-    fontWeight: '600',
-  },
-  dotsContainer: {
-    position: 'absolute',
-    bottom: 130,
-    flexDirection: 'row',
-    alignSelf: 'center',
-  },
-  dot: {
-    height: 10,
-    borderRadius: 5,
-    marginHorizontal: 5,
-  },
-  activeDot: {
-    backgroundColor: '#00BCD4',
-    width: 30,
-  },
-  inactiveDot: {
-    backgroundColor: '#4A5568',
-    width: 10,
-  },
-  nextButton: {
-    position: 'absolute',
-    bottom: 50,
-    left: 30,
-    right: 30,
-    backgroundColor: '#00BCD4',
-    paddingVertical: 18,
-    borderRadius: 30,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  nextButtonText: {
-    fontSize: 18,
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    marginRight: 8,
-  },
-  arrow: {
-    fontSize: 24,
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-  },
-});
 
 export default OnboardingScreen;
