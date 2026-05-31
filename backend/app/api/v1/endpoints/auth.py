@@ -393,3 +393,122 @@ async def resend_otp(
     logger.info(f"OTP resent successfully to {email}")
     
     return {"message": "OTP sent successfully", "email": email}
+
+
+@router.post(
+    "/forgot-password",
+    status_code=status.HTTP_200_OK,
+    responses={
+        200: {"description": "Password reset link sent successfully"},
+        404: {"model": ErrorResponse, "description": "User not found"}
+    }
+)
+async def forgot_password(
+    email: str,
+    db: AsyncIOMotorDatabase = Depends(mongodb.get_database)
+):
+    """
+    Send password reset link to user's email
+    
+    Args:
+        email: User's email address
+        db: MongoDB database instance
+        
+    Returns:
+        Success message
+        
+    Raises:
+        HTTPException: 404 if user not found
+    """
+    logger.info(f"Password reset request for email: {email}")
+    
+    # Check if user exists
+    user = await db.users.find_one({"email": email})
+    if not user:
+        logger.warning(f"User not found for email: {email}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Generate password reset token (OTP)
+    reset_token = email_service.generate_otp()
+    email_service.store_otp(email, reset_token)
+    
+    # Send password reset email
+    email_sent = email_service.send_password_reset_email(email, user["full_name"], reset_token)
+    
+    if not email_sent:
+        logger.error(f"Failed to send password reset email to {email}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send password reset email"
+        )
+    
+    logger.info(f"Password reset email sent successfully to {email}")
+    
+    return {"message": "Password reset link sent successfully", "email": email}
+
+
+@router.post(
+    "/reset-password",
+    status_code=status.HTTP_200_OK,
+    responses={
+        200: {"description": "Password reset successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid or expired token"}
+    }
+)
+async def reset_password(
+    email: str,
+    token: str,
+    new_password: str,
+    db: AsyncIOMotorDatabase = Depends(mongodb.get_database)
+):
+    """
+    Reset user password with token
+    
+    Args:
+        email: User's email address
+        token: Password reset token (OTP)
+        new_password: New password
+        db: MongoDB database instance
+        
+    Returns:
+        Success message
+        
+    Raises:
+        HTTPException: 400 if token is invalid or expired
+    """
+    logger.info(f"Password reset attempt for email: {email}")
+    
+    # Verify token
+    if not email_service.verify_otp(email, token):
+        logger.warning(f"Invalid or expired reset token for {email}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token"
+        )
+    
+    # Hash new password
+    password_hash = auth_service.hash_password(new_password)
+    
+    # Update password
+    result = await db.users.update_one(
+        {"email": email},
+        {"$set": {
+            "password_hash": password_hash,
+            "updated_at": datetime.utcnow()
+        }}
+    )
+    
+    if result.modified_count == 0:
+        logger.warning(f"User not found for email: {email}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    logger.info(f"Password reset successfully for {email}")
+    
+    return {"message": "Password reset successfully", "email": email}
+

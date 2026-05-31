@@ -17,6 +17,7 @@ import TankScreen from './src/screens/TankScreen';
 import AlertsScreen from './src/screens/AlertsScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
+import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
 
 const { width, height } = Dimensions.get('window');
 const ONBOARDING_COMPLETED_KEY = '@onboarding_completed';
@@ -167,6 +168,7 @@ function App() {
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="SignUp" component={SignUpScreen} />
           <Stack.Screen name="OTPVerification" component={OTPVerificationScreen} />
+          <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
           <Stack.Screen name="MainApp" component={MainTabs} />
           <Stack.Screen name="History" component={HistoryScreen} />
         </Stack.Navigator>

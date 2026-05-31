@@ -108,6 +108,20 @@ export const authAPI = {
     await AsyncStorage.setItem(TOKEN_KEY, access_token);
     return access_token;
   },
+
+  forgotPassword: async (email) => {
+    const response = await apiClient.post('/api/v1/auth/forgot-password', null, {
+      params: { email }
+    });
+    return response.data;
+  },
+
+  resetPassword: async (data) => {
+    const response = await apiClient.post('/api/v1/auth/reset-password', null, {
+      params: data
+    });
+    return response.data;
+  },
 };
 
 export const statusAPI = {

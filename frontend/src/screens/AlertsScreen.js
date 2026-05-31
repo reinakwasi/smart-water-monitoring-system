@@ -12,10 +12,12 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import { useTheme } from '../context/ThemeContext';
 
 const API_BASE_URL = 'http://10.0.2.2:8000/api/v1';
 
 const AlertsScreen = ({ navigation }) => {
+  const { theme } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
   const [alerts, setAlerts] = useState([]);
   const [newAlertsCount, setNewAlertsCount] = useState(0);
@@ -186,8 +188,8 @@ const AlertsScreen = ({ navigation }) => {
   const yesterdayAlerts = alerts.filter(alert => alert.section === 'YESTERDAY');
 
   return (
-    <View className="flex-1 bg-gray-50">
-      <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
+    <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
+      <StatusBar barStyle={theme.colors.statusBar} backgroundColor={theme.colors.statusBarBg} />
       
       <ScrollView 
         showsVerticalScrollIndicator={false}
@@ -200,8 +202,8 @@ const AlertsScreen = ({ navigation }) => {
         <View className="px-5 pt-12 pb-4">
           <View className="flex-row justify-between items-center">
             <View>
-              <Text className="text-2xl font-bold text-slate-800">Alerts</Text>
-              <Text className="text-sm text-slate-400">Tap any alert for details</Text>
+              <Text className="text-2xl font-bold" style={{ color: theme.colors.text }}>Alerts</Text>
+              <Text className="text-sm" style={{ color: theme.colors.textTertiary }}>Tap any alert for details</Text>
             </View>
             <View className="flex-row items-center">
               {newAlertsCount > 0 && (
@@ -222,12 +224,13 @@ const AlertsScreen = ({ navigation }) => {
         {/* TODAY Section */}
         {todayAlerts.length > 0 && (
           <View className="px-5 mb-5">
-            <Text className="text-xs font-semibold text-slate-400 tracking-wider mb-4">TODAY</Text>
+            <Text className="text-xs font-semibold tracking-wider mb-4" style={{ color: theme.colors.textTertiary }}>TODAY</Text>
             
             {todayAlerts.map((alert) => (
               <TouchableOpacity
                 key={alert.id}
-                className={`bg-white rounded-2xl p-4 mb-4 shadow-sm border-l-4 ${alert.borderColor}`}
+                className={`rounded-2xl p-4 mb-4 shadow-sm border-l-4 ${alert.borderColor}`}
+                style={{ backgroundColor: theme.colors.cardBackground }}
                 onPress={() => handleAlertPress(alert)}
               >
                 <View className="flex-row">
@@ -237,11 +240,11 @@ const AlertsScreen = ({ navigation }) => {
                   
                   <View className="flex-1">
                     <View className="flex-row justify-between items-start mb-2">
-                      <Text className="text-base font-bold text-slate-800 flex-1">{alert.title}</Text>
-                      <Text className="text-xs text-slate-400 ml-2">{alert.time}</Text>
+                      <Text className="text-base font-bold flex-1" style={{ color: theme.colors.text }}>{alert.title}</Text>
+                      <Text className="text-xs ml-2" style={{ color: theme.colors.textTertiary }}>{alert.time}</Text>
                     </View>
                     
-                    <Text className="text-sm text-slate-600 leading-5 mb-3">{alert.message}</Text>
+                    <Text className="text-sm leading-5 mb-3" style={{ color: theme.colors.textSecondary }}>{alert.message}</Text>
                     
                     <View className={`self-start px-3 py-1 rounded-full ${alert.badgeBg}`}>
                       <Text className={`text-xs font-semibold ${alert.badgeText}`}>{alert.badge}</Text>
@@ -256,12 +259,13 @@ const AlertsScreen = ({ navigation }) => {
         {/* YESTERDAY Section */}
         {yesterdayAlerts.length > 0 && (
           <View className="px-5 mb-8">
-            <Text className="text-xs font-semibold text-slate-400 tracking-wider mb-4">YESTERDAY</Text>
+            <Text className="text-xs font-semibold tracking-wider mb-4" style={{ color: theme.colors.textTertiary }}>YESTERDAY</Text>
             
             {yesterdayAlerts.map((alert) => (
               <TouchableOpacity
                 key={alert.id}
-                className={`bg-white rounded-2xl p-4 mb-4 shadow-sm border-l-4 ${alert.borderColor}`}
+                className={`rounded-2xl p-4 mb-4 shadow-sm border-l-4 ${alert.borderColor}`}
+                style={{ backgroundColor: theme.colors.cardBackground }}
                 onPress={() => handleAlertPress(alert)}
               >
                 <View className="flex-row">
@@ -271,11 +275,11 @@ const AlertsScreen = ({ navigation }) => {
                   
                   <View className="flex-1">
                     <View className="flex-row justify-between items-start mb-2">
-                      <Text className="text-base font-bold text-slate-400 flex-1">{alert.title}</Text>
-                      <Text className="text-xs text-slate-400 ml-2">{alert.time}</Text>
+                      <Text className="text-base font-bold flex-1" style={{ color: theme.colors.textTertiary }}>{alert.title}</Text>
+                      <Text className="text-xs ml-2" style={{ color: theme.colors.textTertiary }}>{alert.time}</Text>
                     </View>
                     
-                    <Text className="text-sm text-slate-400 leading-5 mb-3">{alert.message}</Text>
+                    <Text className="text-sm leading-5 mb-3" style={{ color: theme.colors.textTertiary }}>{alert.message}</Text>
                     
                     <View className={`self-start px-3 py-1 rounded-full ${alert.badgeBg}`}>
                       <Text className={`text-xs font-semibold ${alert.badgeText}`}>{alert.badge}</Text>
@@ -290,9 +294,9 @@ const AlertsScreen = ({ navigation }) => {
         {/* Empty State */}
         {alerts.length === 0 && (
           <View className="flex-1 justify-center items-center px-5 py-20">
-            <MaterialIcons name="notifications-none" size={64} color="#CBD5E1" />
-            <Text className="text-lg font-semibold text-slate-400 mt-4">No alerts</Text>
-            <Text className="text-sm text-slate-400 text-center mt-2">
+            <MaterialIcons name="notifications-none" size={64} color={theme.colors.border} />
+            <Text className="text-lg font-semibold mt-4" style={{ color: theme.colors.textTertiary }}>No alerts</Text>
+            <Text className="text-sm text-center mt-2" style={{ color: theme.colors.textTertiary }}>
               You're all caught up! We'll notify you when something needs your attention.
             </Text>
           </View>
