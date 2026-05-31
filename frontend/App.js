@@ -5,7 +5,6 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { getFCMToken, setupFCMListeners } from './src/services/fcm';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 import SignUpScreen from './src/screens/SignUpScreen';
@@ -15,6 +14,7 @@ import HomeScreen from './src/screens/HomeScreen';
 import ReportsScreen from './src/screens/ReportsScreen';
 import TankScreen from './src/screens/TankScreen';
 import AlertsScreen from './src/screens/AlertsScreen';
+import SettingsScreen from './src/screens/SettingsScreen';
 
 const { width, height } = Dimensions.get('window');
 const ONBOARDING_COMPLETED_KEY = '@onboarding_completed';
@@ -41,9 +41,8 @@ function MainTabs() {
           fontWeight: '500',
           marginTop: -4,
         },
-        tabBarIcon: ({ focused, color, size }) => {
+        tabBarIcon: ({ focused, color }) => {
           let iconName;
-          let IconComponent = MaterialIcons;
 
           if (route.name === 'Home') {
             iconName = 'home';
@@ -80,16 +79,8 @@ function MainTabs() {
       <Tab.Screen name="Reports" component={ReportsScreen} />
       <Tab.Screen name="Tank" component={TankScreen} />
       <Tab.Screen name="Alerts" component={AlertsScreen} />
-      <Tab.Screen name="Settings" component={PlaceholderScreen} />
+      <Tab.Screen name="Settings" component={SettingsScreen} />
     </Tab.Navigator>
-  );
-}
-
-function PlaceholderScreen() {
-  return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8FAFC' }}>
-      <MaterialIcons name="construction" size={64} color="#94A3B8" />
-    </View>
   );
 }
 
