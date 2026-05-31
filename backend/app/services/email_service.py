@@ -332,75 +332,100 @@ class EmailService:
         """
         
         return self.send_email(to_email, subject, html_content)
+    
+    def send_password_reset_email(self, email: str, full_name: str, reset_token: str) -> bool:
+        """Send password reset email with token"""
+        subject = "Password Reset - AquaGuard"
+        
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body {{
+                    font-family: Arial, sans-serif;
+                    line-height: 1.6;
+                    color: #333;
+                }}
+                .container {{
+                    max-width: 600px;
+                    margin: 0 auto;
+                    padding: 20px;
+                }}
+                .header {{
+                    background: linear-gradient(135deg, #0891B2 0%, #0B7FA5 100%);
+                    color: white;
+                    padding: 30px;
+                    text-align: center;
+                    border-radius: 10px 10px 0 0;
+                }}
+                .content {{
+                    background: #f8f9fa;
+                    padding: 30px;
+                    border-radius: 0 0 10px 10px;
+                }}
+                .otp-box {{
+                    background: white;
+                    border: 2px dashed #0891B2;
+                    border-radius: 10px;
+                    padding: 20px;
+                    text-align: center;
+                    margin: 20px 0;
+                }}
+                .otp-code {{
+                    font-size: 32px;
+                    font-weight: bold;
+                    color: #0891B2;
+                    letter-spacing: 8px;
+                }}
+                .warning {{
+                    background: #fff3cd;
+                    border-left: 4px solid #ffc107;
+                    padding: 15px;
+                    margin: 20px 0;
+                    border-radius: 5px;
+                }}
+                .footer {{
+                    text-align: center;
+                    margin-top: 20px;
+                    color: #666;
+                    font-size: 12px;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>🔐 Password Reset Request</h1>
+                </div>
+                <div class="content">
+                    <p>Hi {full_name},</p>
+                    <p>We received a request to reset your password. Use the code below to reset your password:</p>
+                    
+                    <div class="otp-box">
+                        <p style="margin: 0; color: #666; font-size: 14px;">Your Reset Code</p>
+                        <div class="otp-code">{reset_token}</div>
+                        <p style="margin: 10px 0 0 0; color: #666; font-size: 12px;">Valid for {self.otp_expiry_minutes} minutes</p>
+                    </div>
+                    
+                    <div class="warning">
+                        <strong>⚠️ Security Notice:</strong>
+                        <p style="margin: 5px 0 0 0;">If you didn't request this password reset, please ignore this email or contact support if you have concerns.</p>
+                    </div>
+                    
+                    <p>Best regards,<br>The {self.from_name} Team</p>
+                </div>
+                <div class="footer">
+                    <p>© 2025 {self.from_name}. All rights reserved.</p>
+                    <p>This is an automated email. Please do not reply.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        return self.send_email(email, subject, html_content)
 
 
 # Singleton instance
 email_service = EmailService()
-
-    def send_password_reset_email(self, email: str, full_name: str, reset_token: str) -> bool:
-        """Send password reset email with token"""
-        try:
-            msg = MIMEMultipart('alternative')
-            msg['Subject'] = f"Password Reset - {self.from_name}"
-            msg['From'] = f"{self.from_name} <{self.from_email}>"
-            msg['To'] = email
-            
-            html = f"""
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <style>
-                    body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-                    .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                    .header {{ background: linear-gradient(135deg, #0891B2 0%, #0B7FA5 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
-                    .content {{ background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; }}
-                    .otp-box {{ background: white; border: 2px dashed #0891B2; border-radius: 10px; padding: 20px; text-align: center; margin: 20px 0; }}
-                    .otp-code {{ font-size: 32px; font-weight: bold; color: #0891B2; letter-spacing: 8px; }}
-                    .warning {{ background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 5px; }}
-                    .footer {{ text-align: center; margin-top: 20px; color: #666; font-size: 12px; }}
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <div class="header">
-                        <h1>🔐 Password Reset Request</h1>
-                    </div>
-                    <div class="content">
-                        <p>Hi {full_name},</p>
-                        <p>We received a request to reset your password. Use the code below to reset your password:</p>
-                        
-                        <div class="otp-box">
-                            <p style="margin: 0; color: #666; font-size: 14px;">Your Reset Code</p>
-                            <div class="otp-code">{reset_token}</div>
-                            <p style="margin: 10px 0 0 0; color: #666; font-size: 12px;">Valid for {self.otp_expiry_minutes} minutes</p>
-                        </div>
-                        
-                        <div class="warning">
-                            <strong>⚠️ Security Notice:</strong>
-                            <p style="margin: 5px 0 0 0;">If you didn't request this password reset, please ignore this email or contact support if you have concerns.</p>
-                        </div>
-                        
-                        <p>Best regards,<br>The {self.from_name} Team</p>
-                    </div>
-                    <div class="footer">
-                        <p>© 2025 {self.from_name}. All rights reserved.</p>
-                        <p>This is an automated email. Please do not reply.</p>
-                    </div>
-                </div>
-            </body>
-            </html>
-            """
-            
-            msg.attach(MIMEText(html, 'html'))
-            
-            with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
-                server.starttls()
-                server.login(self.smtp_user, self.smtp_password)
-                server.send_message(msg)
-            
-            logger.info(f"Password reset email sent successfully to {email}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Failed to send password reset email to {email}: {str(e)}")
-            return False

@@ -44,9 +44,22 @@ const HomeScreen = ({ navigation }) => {
 
   useEffect(() => {
     updateGreeting();
+    loadUserName();
     const interval = setInterval(updateGreeting, 60000);
     return () => clearInterval(interval);
   }, []);
+
+  const loadUserName = async () => {
+    try {
+      const name = await AsyncStorage.getItem('@user_name');
+      if (name) {
+        const firstName = name.split(' ')[0];
+        setUserName(firstName);
+      }
+    } catch (error) {
+      console.error('Error loading user name:', error);
+    }
+  };
 
   useEffect(() => {
     fetchCurrentStatus();

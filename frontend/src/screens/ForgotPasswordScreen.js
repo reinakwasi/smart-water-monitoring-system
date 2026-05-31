@@ -41,12 +41,12 @@ const ForgotPasswordScreen = ({ navigation }) => {
       await authAPI.forgotPassword(email.trim().toLowerCase());
       
       Alert.alert(
-        'Reset Link Sent',
-        'We\'ve sent a password reset link to your email. Please check your inbox and spam folder.',
+        'Reset Code Sent',
+        'We\'ve sent a 6-digit reset code to your email. Please check your inbox and spam folder.',
         [
           {
             text: 'OK',
-            onPress: () => navigation.goBack()
+            onPress: () => navigation.navigate('ResetPassword', { email: email.trim().toLowerCase() })
           }
         ]
       );

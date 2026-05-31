@@ -477,7 +477,7 @@ async def reset_password(
         Success message
         
     Raises:
-        HTTPException: 400 if token is invalid or expired
+        HTTPException: 400 if token is invalid or expired or new password same as current
     """
     logger.info(f"Password reset attempt for email: {email}")
     
@@ -487,6 +487,23 @@ async def reset_password(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired reset token"
+        )
+    
+    # Get user to check current password
+    user = await db.users.find_one({"email": email})
+    if not user:
+        logger.warning(f"User not found for email: {email}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Check if new password is same as current password
+    if auth_service.verify_password(new_password, user["password_hash"]):
+        logger.warning(f"Password reset failed: New password same as current for {email}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password cannot be the same as your current password"
         )
     
     # Hash new password
@@ -502,10 +519,10 @@ async def reset_password(
     )
     
     if result.modified_count == 0:
-        logger.warning(f"User not found for email: {email}")
+        logger.warning(f"Failed to update password for email: {email}")
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update password"
         )
     
     logger.info(f"Password reset successfully for {email}")

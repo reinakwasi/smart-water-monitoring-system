@@ -116,9 +116,13 @@ export const authAPI = {
     return response.data;
   },
 
-  resetPassword: async (data) => {
+  resetPassword: async (email, token, newPassword) => {
     const response = await apiClient.post('/api/v1/auth/reset-password', null, {
-      params: data
+      params: { 
+        email: email,
+        token: token,
+        new_password: newPassword
+      }
     });
     return response.data;
   },

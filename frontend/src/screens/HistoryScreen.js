@@ -22,6 +22,7 @@ const HistoryScreen = ({ navigation }) => {
   const { theme } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
   const [timeRange, setTimeRange] = useState('7D');
+  const [showTimeRangeMenu, setShowTimeRangeMenu] = useState(false);
   const [historyData, setHistoryData] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -60,7 +61,11 @@ const HistoryScreen = ({ navigation }) => {
     const history = [];
     const now = new Date();
     
-    for (let i = 0; i < 7; i++) {
+    let days = 7;
+    if (timeRange === '30D') days = 30;
+    if (timeRange === 'All') days = 90;
+    
+    for (let i = 0; i < days; i++) {
       const date = new Date(now);
       date.setDate(date.getDate() - i);
       
@@ -169,6 +174,20 @@ const HistoryScreen = ({ navigation }) => {
     return 'text-slate-600';
   };
 
+  const getTimeRangeLabel = () => {
+    switch (timeRange) {
+      case '7D': return 'Last 7 days';
+      case '30D': return 'Last 30 days';
+      case 'All': return 'All time';
+      default: return 'Last 7 days';
+    }
+  };
+
+  const handleTimeRangeSelect = (range) => {
+    setTimeRange(range);
+    setShowTimeRangeMenu(false);
+  };
+
   const handleDownloadReport = () => {
     Alert.alert('Download Report', 'Report download feature coming soon. You will be able to download your water quality data as PDF or CSV.');
   };
@@ -188,12 +207,44 @@ const HistoryScreen = ({ navigation }) => {
         <View className="px-5 pt-12 pb-4 flex-row justify-between items-center">
           <View>
             <Text className="text-2xl font-bold" style={{ color: theme.colors.text }}>Past Readings</Text>
-            <Text className="text-sm" style={{ color: theme.colors.textTertiary }}>Last 7 days</Text>
+            <Text className="text-sm" style={{ color: theme.colors.textTertiary }}>{getTimeRangeLabel()}</Text>
           </View>
-          <View className="bg-cyan-100 px-3 py-1.5 rounded-lg">
+          <TouchableOpacity 
+            className="bg-cyan-100 px-3 py-1.5 rounded-lg"
+            onPress={() => setShowTimeRangeMenu(!showTimeRangeMenu)}
+          >
             <Text className="text-xs font-bold text-cyan-600">{timeRange} ▼</Text>
-          </View>
+          </TouchableOpacity>
         </View>
+
+        {/* Time Range Dropdown Menu */}
+        {showTimeRangeMenu && (
+          <View className="mx-5 mb-4 rounded-2xl shadow-lg" style={{ backgroundColor: theme.colors.cardBackground }}>
+            <TouchableOpacity 
+              className="flex-row justify-between items-center px-4 py-3 border-b"
+              style={{ borderBottomColor: theme.colors.border }}
+              onPress={() => handleTimeRangeSelect('7D')}
+            >
+              <Text className="text-base" style={{ color: theme.colors.text }}>Last 7 days</Text>
+              {timeRange === '7D' && <MaterialIcons name="check" size={20} color="#0891B2" />}
+            </TouchableOpacity>
+            <TouchableOpacity 
+              className="flex-row justify-between items-center px-4 py-3 border-b"
+              style={{ borderBottomColor: theme.colors.border }}
+              onPress={() => handleTimeRangeSelect('30D')}
+            >
+              <Text className="text-base" style={{ color: theme.colors.text }}>Last 30 days</Text>
+              {timeRange === '30D' && <MaterialIcons name="check" size={20} color="#0891B2" />}
+            </TouchableOpacity>
+            <TouchableOpacity 
+              className="flex-row justify-between items-center px-4 py-3"
+              onPress={() => handleTimeRangeSelect('All')}
+            >
+              <Text className="text-base" style={{ color: theme.colors.text }}>All time</Text>
+              {timeRange === 'All' && <MaterialIcons name="check" size={20} color="#0891B2" />}
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* pH Level Trend */}
         <View className="mx-5 rounded-2xl p-4 mb-4 shadow-sm" style={{ backgroundColor: theme.colors.cardBackground }}>
