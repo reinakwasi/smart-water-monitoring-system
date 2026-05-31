@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authAPI } from '../services/api';
 import GoogleIcon from '../components/GoogleIcon';
 
@@ -20,6 +21,29 @@ const LoginScreen = ({ navigation }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    loadSavedCredentials();
+  }, []);
+
+  const loadSavedCredentials = async () => {
+    try {
+      const savedEmail = await AsyncStorage.getItem('@saved_email');
+      const savedPassword = await AsyncStorage.getItem('@saved_password');
+      const savedRememberMe = await AsyncStorage.getItem('@remember_me');
+      
+      if (savedEmail) {
+        setEmail(savedEmail);
+      }
+      
+      if (savedRememberMe === 'true' && savedPassword) {
+        setPassword(savedPassword);
+        setRememberMe(true);
+      }
+    } catch (error) {
+      console.error('Error loading saved credentials:', error);
+    }
+  };
 
   const validateEmail = (email) => {
     const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -54,6 +78,16 @@ const LoginScreen = ({ navigation }) => {
         email: email.trim().toLowerCase(),
         password: password,
       });
+
+      await AsyncStorage.setItem('@saved_email', email.trim().toLowerCase());
+      
+      if (rememberMe) {
+        await AsyncStorage.setItem('@saved_password', password);
+        await AsyncStorage.setItem('@remember_me', 'true');
+      } else {
+        await AsyncStorage.removeItem('@saved_password');
+        await AsyncStorage.setItem('@remember_me', 'false');
+      }
 
       navigation.replace('MainApp');
 
@@ -124,6 +158,8 @@ const LoginScreen = ({ navigation }) => {
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
+              autoComplete="email"
+              textContentType="emailAddress"
               editable={!loading}
             />
           </View>
@@ -141,6 +177,8 @@ const LoginScreen = ({ navigation }) => {
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
+              autoComplete="password"
+              textContentType="password"
               editable={!loading}
             />
             <TouchableOpacity onPress={() => setShowPassword(!showPassword)} disabled={loading}>

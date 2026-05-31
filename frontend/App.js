@@ -14,6 +14,7 @@ import LoginScreen from './src/screens/LoginScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import ReportsScreen from './src/screens/ReportsScreen';
 import TankScreen from './src/screens/TankScreen';
+import AlertsScreen from './src/screens/AlertsScreen';
 
 const { width, height } = Dimensions.get('window');
 const ONBOARDING_COMPLETED_KEY = '@onboarding_completed';
@@ -78,7 +79,7 @@ function MainTabs() {
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Reports" component={ReportsScreen} />
       <Tab.Screen name="Tank" component={TankScreen} />
-      <Tab.Screen name="Alerts" component={PlaceholderScreen} />
+      <Tab.Screen name="Alerts" component={AlertsScreen} />
       <Tab.Screen name="Settings" component={PlaceholderScreen} />
     </Tab.Navigator>
   );
