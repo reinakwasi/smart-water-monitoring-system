@@ -80,6 +80,7 @@ const LoginScreen = ({ navigation }) => {
       });
 
       await AsyncStorage.setItem('@saved_email', email.trim().toLowerCase());
+      await AsyncStorage.setItem('@user_name', response.user.full_name);
       
       if (rememberMe) {
         await AsyncStorage.setItem('@saved_password', password);

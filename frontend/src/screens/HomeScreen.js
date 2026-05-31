@@ -11,10 +11,12 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import { useTheme } from '../context/ThemeContext';
 
 const API_BASE_URL = 'http://10.0.2.2:8000/api/v1';
 
 const HomeScreen = ({ navigation }) => {
+  const { theme } = useTheme();
   const [greeting, setGreeting] = useState('');
   const [userName, setUserName] = useState('Samuel');
   const [refreshing, setRefreshing] = useState(false);
@@ -177,8 +179,8 @@ const HomeScreen = ({ navigation }) => {
   };
 
   return (
-    <View className="flex-1 bg-gray-50">
-      <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
+    <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
+      <StatusBar barStyle={theme.colors.statusBar} backgroundColor={theme.colors.statusBarBg} />
       
       <ScrollView 
         showsVerticalScrollIndicator={false}
@@ -191,8 +193,8 @@ const HomeScreen = ({ navigation }) => {
         <View className="px-5 pt-12 pb-4">
           <View className="flex-row justify-between items-start">
             <View className="flex-1">
-              <Text className="text-sm text-slate-400 mb-1">{greeting},</Text>
-              <Text className="text-2xl font-bold text-slate-800">{userName} 👋</Text>
+              <Text className="text-sm mb-1" style={{ color: theme.colors.textTertiary }}>{greeting},</Text>
+              <Text className="text-2xl font-bold" style={{ color: theme.colors.text }}>{userName} 👋</Text>
             </View>
             <View className={`bg-${esp32Connected ? 'green' : 'red'}-100 flex-row items-center px-3 py-1.5 rounded-full`}>
               <View className={`w-2 h-2 rounded-full mr-1.5 bg-${esp32Connected ? 'green' : 'red'}-500`} />
@@ -233,7 +235,7 @@ const HomeScreen = ({ navigation }) => {
 
         {/* Live Sensor Readings Header */}
         <View className="flex-row justify-between items-center px-5 mb-4">
-          <Text className="text-xs font-semibold text-slate-400 tracking-wider">LIVE SENSOR READINGS</Text>
+          <Text className="text-xs font-semibold tracking-wider" style={{ color: theme.colors.textTertiary }}>LIVE SENSOR READINGS</Text>
           <TouchableOpacity>
             <Text className="text-sm font-semibold text-[#0B7FA5]">AI View →</Text>
           </TouchableOpacity>
@@ -242,14 +244,14 @@ const HomeScreen = ({ navigation }) => {
         {/* Sensor Cards Grid */}
         <View className="flex-row flex-wrap px-5 mb-5 justify-between">
           {/* pH Sensor */}
-          <View className="w-[48%] bg-white rounded-2xl p-4 mb-4 shadow-sm relative">
+          <View className="w-[48%] rounded-2xl p-4 mb-4 shadow-sm relative" style={{ backgroundColor: theme.colors.cardBackground }}>
             <View className="w-12 h-12 rounded-xl bg-cyan-50 justify-center items-center mb-3">
               <MaterialCommunityIcons name="water" size={24} color="#0891B2" />
             </View>
             <View className="absolute top-4 right-4 w-2 h-2 rounded-full bg-green-500" />
-            <Text className="text-xs text-slate-500 mb-1">pH Sensor</Text>
-            <Text className="text-3xl font-bold text-slate-800 mb-0.5">
-              {waterQuality.parameters.ph.toFixed(1)}<Text className="text-base font-normal text-slate-400">pH</Text>
+            <Text className="text-xs mb-1" style={{ color: theme.colors.textSecondary }}>pH Sensor</Text>
+            <Text className="text-3xl font-bold mb-0.5" style={{ color: theme.colors.text }}>
+              {waterQuality.parameters.ph.toFixed(1)}<Text className="text-base font-normal" style={{ color: theme.colors.textTertiary }}>pH</Text>
             </Text>
             <Text className={`text-xs font-medium ${getParameterStatus('ph', waterQuality.parameters.ph).color}`}>
               {getParameterStatus('ph', waterQuality.parameters.ph).text}
@@ -257,14 +259,14 @@ const HomeScreen = ({ navigation }) => {
           </View>
 
           {/* Turbidity */}
-          <View className="w-[48%] bg-white rounded-2xl p-4 mb-4 shadow-sm relative">
+          <View className="w-[48%] rounded-2xl p-4 mb-4 shadow-sm relative" style={{ backgroundColor: theme.colors.cardBackground }}>
             <View className="w-12 h-12 rounded-xl bg-indigo-50 justify-center items-center mb-3">
               <MaterialCommunityIcons name="circle-opacity" size={24} color="#6366F1" />
             </View>
             <View className="absolute top-4 right-4 w-2 h-2 rounded-full bg-green-500" />
-            <Text className="text-xs text-slate-500 mb-1">Turbidity</Text>
-            <Text className="text-3xl font-bold text-slate-800 mb-0.5">
-              {waterQuality.parameters.turbidity.toFixed(1)}<Text className="text-base font-normal text-slate-400">NTU</Text>
+            <Text className="text-xs mb-1" style={{ color: theme.colors.textSecondary }}>Turbidity</Text>
+            <Text className="text-3xl font-bold mb-0.5" style={{ color: theme.colors.text }}>
+              {waterQuality.parameters.turbidity.toFixed(1)}<Text className="text-base font-normal" style={{ color: theme.colors.textTertiary }}>NTU</Text>
             </Text>
             <Text className={`text-xs font-medium ${getParameterStatus('turbidity', waterQuality.parameters.turbidity).color}`}>
               {getParameterStatus('turbidity', waterQuality.parameters.turbidity).text}
@@ -272,14 +274,14 @@ const HomeScreen = ({ navigation }) => {
           </View>
 
           {/* TDS Meter */}
-          <View className="w-[48%] bg-white rounded-2xl p-4 mb-4 shadow-sm relative">
+          <View className="w-[48%] rounded-2xl p-4 mb-4 shadow-sm relative" style={{ backgroundColor: theme.colors.cardBackground }}>
             <View className="w-12 h-12 rounded-xl bg-green-50 justify-center items-center mb-3">
               <MaterialCommunityIcons name="arrow-collapse-down" size={24} color="#10B981" />
             </View>
             <View className="absolute top-4 right-4 w-2 h-2 rounded-full bg-green-500" />
-            <Text className="text-xs text-slate-500 mb-1">TDS Meter</Text>
-            <Text className="text-3xl font-bold text-slate-800 mb-0.5">
-              {Math.round(waterQuality.parameters.tds)}<Text className="text-base font-normal text-slate-400">ppm</Text>
+            <Text className="text-xs mb-1" style={{ color: theme.colors.textSecondary }}>TDS Meter</Text>
+            <Text className="text-3xl font-bold mb-0.5" style={{ color: theme.colors.text }}>
+              {Math.round(waterQuality.parameters.tds)}<Text className="text-base font-normal" style={{ color: theme.colors.textTertiary }}>ppm</Text>
             </Text>
             <Text className={`text-xs font-medium ${getParameterStatus('tds', waterQuality.parameters.tds).color}`}>
               {getParameterStatus('tds', waterQuality.parameters.tds).text}
@@ -287,14 +289,14 @@ const HomeScreen = ({ navigation }) => {
           </View>
 
           {/* Temperature */}
-          <View className="w-[48%] bg-white rounded-2xl p-4 mb-4 shadow-sm relative">
+          <View className="w-[48%] rounded-2xl p-4 mb-4 shadow-sm relative" style={{ backgroundColor: theme.colors.cardBackground }}>
             <View className="w-12 h-12 rounded-xl bg-yellow-50 justify-center items-center mb-3">
               <MaterialCommunityIcons name="thermometer" size={24} color="#F59E0B" />
             </View>
             <View className={`absolute top-4 right-4 w-2 h-2 rounded-full ${getParameterStatus('temperature', waterQuality.parameters.temperature).color === 'text-orange-500' ? 'bg-orange-500' : 'bg-green-500'}`} />
-            <Text className="text-xs text-slate-500 mb-1">Temperature</Text>
-            <Text className="text-3xl font-bold text-slate-800 mb-0.5">
-              {Math.round(waterQuality.parameters.temperature)}<Text className="text-base font-normal text-slate-400">°C</Text>
+            <Text className="text-xs mb-1" style={{ color: theme.colors.textSecondary }}>Temperature</Text>
+            <Text className="text-3xl font-bold mb-0.5" style={{ color: theme.colors.text }}>
+              {Math.round(waterQuality.parameters.temperature)}<Text className="text-base font-normal" style={{ color: theme.colors.textTertiary }}>°C</Text>
             </Text>
             <Text className={`text-xs font-medium ${getParameterStatus('temperature', waterQuality.parameters.temperature).color}`}>
               {getParameterStatus('temperature', waterQuality.parameters.temperature).text}
@@ -304,24 +306,24 @@ const HomeScreen = ({ navigation }) => {
 
         {/* Tank Storage Header */}
         <View className="flex-row justify-between items-center px-5 mb-4">
-          <Text className="text-xs font-semibold text-slate-400 tracking-wider">TANK STORAGE</Text>
+          <Text className="text-xs font-semibold tracking-wider" style={{ color: theme.colors.textTertiary }}>TANK STORAGE</Text>
           <TouchableOpacity>
             <Text className="text-sm font-semibold text-[#0B7FA5]">Details →</Text>
           </TouchableOpacity>
         </View>
 
         {/* Tank Storage Card */}
-        <View className="bg-white mx-5 rounded-2xl p-5 mb-8 shadow-sm">
+        <View className="rounded-2xl p-5 mb-8 shadow-sm mx-5" style={{ backgroundColor: theme.colors.cardBackground }}>
           <View className="flex-row justify-between items-center">
             <View className="flex-1">
-              <Text className="text-sm text-slate-500 mb-2">Current water level</Text>
-              <Text className="text-5xl font-bold text-slate-800 mb-1">{tankStatus.level_percent}%</Text>
+              <Text className="text-sm mb-2" style={{ color: theme.colors.textSecondary }}>Current water level</Text>
+              <Text className="text-5xl font-bold mb-1" style={{ color: theme.colors.text }}>{tankStatus.level_percent}%</Text>
               <Text className="text-xs text-green-500 font-medium">
                 • {tankStatus.volume_liters}L of {tankStatus.total_capacity}L · {tankStatus.status}
               </Text>
             </View>
             <View className="ml-4">
-              <View className="w-16 h-24 rounded-2xl border-2 border-slate-200 overflow-hidden justify-end bg-slate-50">
+              <View className="w-16 h-24 rounded-2xl border-2 overflow-hidden justify-end" style={{ borderColor: theme.colors.border, backgroundColor: theme.isDarkMode ? '#0F172A' : '#F8FAFC' }}>
                 <View className="w-full bg-[#0B7FA5] rounded-lg" style={{ height: `${tankStatus.level_percent}%` }} />
               </View>
             </View>

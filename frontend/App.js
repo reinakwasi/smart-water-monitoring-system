@@ -6,6 +6,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { getFCMToken, setupFCMListeners } from './src/services/fcm';
+import { ThemeProvider } from './src/context/ThemeContext';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 import SignUpScreen from './src/screens/SignUpScreen';
 import OTPVerificationScreen from './src/screens/OTPVerificationScreen';
@@ -15,6 +16,7 @@ import ReportsScreen from './src/screens/ReportsScreen';
 import TankScreen from './src/screens/TankScreen';
 import AlertsScreen from './src/screens/AlertsScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import HistoryScreen from './src/screens/HistoryScreen';
 
 const { width, height } = Dimensions.get('window');
 const ONBOARDING_COMPLETED_KEY = '@onboarding_completed';
@@ -151,18 +153,25 @@ function App() {
   }
 
   if (showOnboarding) {
-    return <OnboardingScreen onFinish={handleOnboardingFinish} />;
+    return (
+      <ThemeProvider>
+        <OnboardingScreen onFinish={handleOnboardingFinish} />
+      </ThemeProvider>
+    );
   }
 
   return (
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="SignUp" component={SignUpScreen} />
-        <Stack.Screen name="OTPVerification" component={OTPVerificationScreen} />
-        <Stack.Screen name="MainApp" component={MainTabs} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <ThemeProvider>
+      <NavigationContainer>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="SignUp" component={SignUpScreen} />
+          <Stack.Screen name="OTPVerification" component={OTPVerificationScreen} />
+          <Stack.Screen name="MainApp" component={MainTabs} />
+          <Stack.Screen name="History" component={HistoryScreen} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </ThemeProvider>
   );
 }
 

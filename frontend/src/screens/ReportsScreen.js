@@ -11,10 +11,12 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import { useTheme } from '../context/ThemeContext';
 
 const API_BASE_URL = 'http://10.0.2.2:8000/api/v1';
 
 const ReportsScreen = ({ navigation }) => {
+  const { theme } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
   const [lastCheck, setLastCheck] = useState('');
   
@@ -192,8 +194,8 @@ const ReportsScreen = ({ navigation }) => {
   };
 
   return (
-    <View className="flex-1 bg-gray-50">
-      <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
+    <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
+      <StatusBar barStyle={theme.colors.statusBar} backgroundColor={theme.colors.statusBarBg} />
       
       <ScrollView 
         showsVerticalScrollIndicator={false}
@@ -206,8 +208,8 @@ const ReportsScreen = ({ navigation }) => {
         <View className="px-5 pt-12 pb-4">
           <View className="flex-row justify-between items-center">
             <View>
-              <Text className="text-2xl font-bold text-slate-800">AI Analysis</Text>
-              <Text className="text-sm text-slate-400">Latest check · {lastCheck}</Text>
+              <Text className="text-2xl font-bold" style={{ color: theme.colors.text }}>AI Analysis</Text>
+              <Text className="text-sm" style={{ color: theme.colors.textTertiary }}>Latest check · {lastCheck}</Text>
             </View>
             <View className="bg-cyan-100 px-3 py-2 rounded-lg flex-row items-center">
               <MaterialCommunityIcons name="robot" size={16} color="#0891B2" />
@@ -252,16 +254,16 @@ const ReportsScreen = ({ navigation }) => {
 
         {/* What's Causing This */}
         <View className="px-5 mb-4">
-          <Text className="text-xs font-semibold text-slate-400 tracking-wider mb-4">WHAT'S CAUSING THIS?</Text>
+          <Text className="text-xs font-semibold tracking-wider mb-4" style={{ color: theme.colors.textTertiary }}>WHAT'S CAUSING THIS?</Text>
           
-          <View className="bg-white rounded-2xl p-5 shadow-sm">
+          <View className="rounded-2xl p-5 shadow-sm" style={{ backgroundColor: theme.colors.cardBackground }}>
             {/* Turbidity */}
             <View className="mb-4">
               <View className="flex-row justify-between items-center mb-2">
-                <Text className="text-sm font-semibold text-slate-700">Turbidity</Text>
-                <Text className="text-sm font-semibold text-slate-600">{analysis.factors.turbidity.level}</Text>
+                <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>Turbidity</Text>
+                <Text className="text-sm font-semibold" style={{ color: theme.colors.textSecondary }}>{analysis.factors.turbidity.level}</Text>
               </View>
-              <View className="h-2 bg-slate-200 rounded-full overflow-hidden">
+              <View className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: theme.isDarkMode ? '#334155' : '#E2E8F0' }}>
                 <View 
                   className="h-full bg-cyan-500 rounded-full" 
                   style={{ width: `${getFactorBarWidth(analysis.factors.turbidity.value)}%` }}
@@ -272,10 +274,10 @@ const ReportsScreen = ({ navigation }) => {
             {/* pH Level */}
             <View className="mb-4">
               <View className="flex-row justify-between items-center mb-2">
-                <Text className="text-sm font-semibold text-slate-700">pH Level</Text>
-                <Text className="text-sm font-semibold text-slate-600">{analysis.factors.ph.level}</Text>
+                <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>pH Level</Text>
+                <Text className="text-sm font-semibold" style={{ color: theme.colors.textSecondary }}>{analysis.factors.ph.level}</Text>
               </View>
-              <View className="h-2 bg-slate-200 rounded-full overflow-hidden">
+              <View className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: theme.isDarkMode ? '#334155' : '#E2E8F0' }}>
                 <View 
                   className="h-full bg-cyan-500 rounded-full" 
                   style={{ width: `${getFactorBarWidth(analysis.factors.ph.value)}%` }}
@@ -286,10 +288,10 @@ const ReportsScreen = ({ navigation }) => {
             {/* TDS */}
             <View className="mb-4">
               <View className="flex-row justify-between items-center mb-2">
-                <Text className="text-sm font-semibold text-slate-700">TDS</Text>
-                <Text className="text-sm font-semibold text-slate-600">{analysis.factors.tds.level}</Text>
+                <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>TDS</Text>
+                <Text className="text-sm font-semibold" style={{ color: theme.colors.textSecondary }}>{analysis.factors.tds.level}</Text>
               </View>
-              <View className="h-2 bg-slate-200 rounded-full overflow-hidden">
+              <View className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: theme.isDarkMode ? '#334155' : '#E2E8F0' }}>
                 <View 
                   className="h-full bg-cyan-500 rounded-full" 
                   style={{ width: `${getFactorBarWidth(analysis.factors.tds.value)}%` }}
@@ -300,10 +302,10 @@ const ReportsScreen = ({ navigation }) => {
             {/* Temperature */}
             <View>
               <View className="flex-row justify-between items-center mb-2">
-                <Text className="text-sm font-semibold text-slate-700">Temperature</Text>
-                <Text className="text-sm font-semibold text-slate-600">{analysis.factors.temperature.level}</Text>
+                <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>Temperature</Text>
+                <Text className="text-sm font-semibold" style={{ color: theme.colors.textSecondary }}>{analysis.factors.temperature.level}</Text>
               </View>
-              <View className="h-2 bg-slate-200 rounded-full overflow-hidden">
+              <View className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: theme.isDarkMode ? '#334155' : '#E2E8F0' }}>
                 <View 
                   className="h-full bg-cyan-500 rounded-full" 
                   style={{ width: `${getFactorBarWidth(analysis.factors.temperature.value)}%` }}
@@ -330,7 +332,7 @@ const ReportsScreen = ({ navigation }) => {
               </View>
             </View>
             
-            <Text className="text-sm text-slate-700 leading-6">
+            <Text className="text-sm leading-6" style={{ color: theme.isDarkMode ? '#334155' : '#475569' }}>
               {analysis.explanation}
             </Text>
           </View>

@@ -12,10 +12,13 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import { useTheme } from '../context/ThemeContext';
 
 const API_BASE_URL = 'http://10.0.2.2:8000/api/v1';
 
 const SettingsScreen = ({ navigation }) => {
+  const { theme, toggleDarkMode } = useTheme();
+  
   const [userProfile, setUserProfile] = useState({
     name: 'Samuel Antwi-Adjei',
     email: 'samuel@email.com',
@@ -45,23 +48,21 @@ const SettingsScreen = ({ navigation }) => {
   const loadUserProfile = async () => {
     try {
       const savedEmail = await AsyncStorage.getItem('@saved_email');
-      const token = await AsyncStorage.getItem('@access_token');
+      const savedName = await AsyncStorage.getItem('@user_name');
       
-      if (savedEmail) {
-        const nameParts = savedEmail.split('@')[0].split('.');
+      if (savedEmail && savedName) {
+        const nameParts = savedName.split(' ');
         const firstName = nameParts[0] || 'User';
-        const lastName = nameParts[1] || '';
-        const fullName = `${firstName.charAt(0).toUpperCase() + firstName.slice(1)} ${lastName.charAt(0).toUpperCase() + lastName.slice(1)}`.trim();
+        const lastName = nameParts[nameParts.length - 1] || '';
         const initials = `${firstName.charAt(0).toUpperCase()}${lastName.charAt(0).toUpperCase() || firstName.charAt(1).toUpperCase()}`;
         
         setUserProfile({
-          name: fullName || 'User',
+          name: savedName,
           email: savedEmail,
           initials: initials || 'U',
         });
       }
     } catch (error) {
-      console.error('Error loading user profile:', error);
     }
   };
 
@@ -118,10 +119,16 @@ const SettingsScreen = ({ navigation }) => {
     }
   };
 
-  const toggleSetting = (key) => {
-    const newSettings = { ...settings, [key]: !settings[key] };
-    setSettings(newSettings);
-    saveSettings(newSettings);
+  const toggleSetting = async (key) => {
+    if (key === 'darkMode') {
+      const newValue = !settings[key];
+      setSettings({ ...settings, [key]: newValue });
+      await toggleDarkMode(newValue);
+    } else {
+      const newSettings = { ...settings, [key]: !settings[key] };
+      setSettings(newSettings);
+      saveSettings(newSettings);
+    }
   };
 
   const handleEditProfile = () => {
@@ -164,8 +171,8 @@ const SettingsScreen = ({ navigation }) => {
   };
 
   return (
-    <View className="flex-1 bg-gray-50">
-      <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
+    <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
+      <StatusBar barStyle={theme.colors.statusBar} backgroundColor={theme.colors.statusBarBg} />
       
       <ScrollView 
         showsVerticalScrollIndicator={false}
@@ -173,8 +180,8 @@ const SettingsScreen = ({ navigation }) => {
       >
         {/* Header */}
         <View className="px-5 pt-12 pb-4">
-          <Text className="text-2xl font-bold text-slate-800">Settings</Text>
-          <Text className="text-sm text-slate-400">Account & preferences</Text>
+          <Text className="text-2xl font-bold" style={{ color: theme.colors.text }}>Settings</Text>
+          <Text className="text-sm" style={{ color: theme.colors.textTertiary }}>Account & preferences</Text>
         </View>
 
         {/* Profile Card */}
@@ -207,15 +214,15 @@ const SettingsScreen = ({ navigation }) => {
 
         {/* Connected Device */}
         <View className="px-5 mb-5">
-          <Text className="text-xs font-semibold text-slate-400 tracking-wider mb-4">CONNECTED DEVICE</Text>
+          <Text className="text-xs font-semibold tracking-wider mb-4" style={{ color: theme.colors.textTertiary }}>CONNECTED DEVICE</Text>
           
-          <View className="bg-white rounded-2xl p-4 shadow-sm">
+          <View className="rounded-2xl p-4 shadow-sm" style={{ backgroundColor: theme.colors.cardBackground }}>
             <View className="flex-row items-center mb-3">
               <View className="w-12 h-12 rounded-xl bg-cyan-500 justify-center items-center mr-3">
                 <MaterialCommunityIcons name="chip" size={24} color="#FFFFFF" />
               </View>
               <View className="flex-1">
-                <Text className="text-base font-bold text-slate-800">ESP32 SENSOR HUB</Text>
+                <Text className="text-base font-bold" style={{ color: theme.colors.text }}>ESP32 SENSOR HUB</Text>
               </View>
               <View className={`px-3 py-1 rounded-full ${esp32Status.online ? 'bg-green-100' : 'bg-red-100'}`}>
                 <Text className={`text-xs font-semibold ${esp32Status.online ? 'text-green-700' : 'text-red-700'}`}>
@@ -224,14 +231,14 @@ const SettingsScreen = ({ navigation }) => {
               </View>
             </View>
             
-            <View className="flex-row justify-between bg-slate-50 rounded-xl p-3">
+            <View className="flex-row justify-between rounded-xl p-3" style={{ backgroundColor: theme.isDarkMode ? '#0F172A' : '#F8FAFC' }}>
               <View className="flex-1">
-                <Text className="text-xs text-slate-500 mb-1">Wi-Fi Signal</Text>
-                <Text className="text-sm font-semibold text-slate-700">{esp32Status.wifiSignal}</Text>
+                <Text className="text-xs mb-1" style={{ color: theme.colors.textSecondary }}>Wi-Fi Signal</Text>
+                <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>{esp32Status.wifiSignal}</Text>
               </View>
               <View className="flex-1 items-end">
-                <Text className="text-xs text-slate-500 mb-1">Last Sync</Text>
-                <Text className="text-sm font-semibold text-slate-700">{esp32Status.lastSync}</Text>
+                <Text className="text-xs mb-1" style={{ color: theme.colors.textSecondary }}>Last Sync</Text>
+                <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>{esp32Status.lastSync}</Text>
               </View>
             </View>
           </View>
@@ -239,16 +246,16 @@ const SettingsScreen = ({ navigation }) => {
 
         {/* Appearance */}
         <View className="px-5 mb-5">
-          <Text className="text-xs font-semibold text-slate-400 tracking-wider mb-4">APPEARANCE</Text>
+          <Text className="text-xs font-semibold tracking-wider mb-4" style={{ color: theme.colors.textTertiary }}>APPEARANCE</Text>
           
-          <View className="bg-white rounded-2xl p-4 shadow-sm">
+          <View className="rounded-2xl p-4 shadow-sm" style={{ backgroundColor: theme.colors.cardBackground }}>
             <View className="flex-row items-center">
-              <View className="w-10 h-10 rounded-xl bg-slate-100 justify-center items-center mr-3">
-                <MaterialIcons name="dark-mode" size={20} color="#64748B" />
+              <View className="w-10 h-10 rounded-xl justify-center items-center mr-3" style={{ backgroundColor: theme.isDarkMode ? '#334155' : '#F1F5F9' }}>
+                <MaterialIcons name="dark-mode" size={20} color={theme.colors.textSecondary} />
               </View>
               <View className="flex-1">
-                <Text className="text-base font-semibold text-slate-800">Dark Mode</Text>
-                <Text className="text-xs text-slate-500">Easier on the eyes at night</Text>
+                <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>Dark Mode</Text>
+                <Text className="text-xs" style={{ color: theme.colors.textSecondary }}>Easier on the eyes at night</Text>
               </View>
               <Switch
                 value={settings.darkMode}
@@ -262,17 +269,17 @@ const SettingsScreen = ({ navigation }) => {
 
         {/* Notifications */}
         <View className="px-5 mb-5">
-          <Text className="text-xs font-semibold text-slate-400 tracking-wider mb-4">NOTIFICATIONS</Text>
+          <Text className="text-xs font-semibold tracking-wider mb-4" style={{ color: theme.colors.textTertiary }}>NOTIFICATIONS</Text>
           
-          <View className="bg-white rounded-2xl p-4 shadow-sm">
+          <View className="rounded-2xl p-4 shadow-sm" style={{ backgroundColor: theme.colors.cardBackground }}>
             {/* Unsafe Water Alerts */}
-            <View className="flex-row items-center mb-4 pb-4 border-b border-slate-100">
+            <View className="flex-row items-center mb-4 pb-4" style={{ borderBottomWidth: 1, borderBottomColor: theme.colors.border }}>
               <View className="w-10 h-10 rounded-xl bg-red-50 justify-center items-center mr-3">
                 <MaterialIcons name="warning" size={20} color="#EF4444" />
               </View>
               <View className="flex-1">
-                <Text className="text-base font-semibold text-slate-800">Unsafe water alerts</Text>
-                <Text className="text-xs text-slate-500">When water is not safe to drink</Text>
+                <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>Unsafe water alerts</Text>
+                <Text className="text-xs" style={{ color: theme.colors.textSecondary }}>When water is not safe to drink</Text>
               </View>
               <Switch
                 value={settings.unsafeWaterAlerts}
@@ -283,13 +290,13 @@ const SettingsScreen = ({ navigation }) => {
             </View>
 
             {/* Contamination Risk */}
-            <View className="flex-row items-center mb-4 pb-4 border-b border-slate-100">
+            <View className="flex-row items-center mb-4 pb-4" style={{ borderBottomWidth: 1, borderBottomColor: theme.colors.border }}>
               <View className="w-10 h-10 rounded-xl bg-yellow-50 justify-center items-center mr-3">
                 <MaterialCommunityIcons name="alert-circle-outline" size={20} color="#F59E0B" />
               </View>
               <View className="flex-1">
-                <Text className="text-base font-semibold text-slate-800">Contamination risk</Text>
-                <Text className="text-xs text-slate-500">High risk warnings</Text>
+                <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>Contamination risk</Text>
+                <Text className="text-xs" style={{ color: theme.colors.textSecondary }}>High risk warnings</Text>
               </View>
               <Switch
                 value={settings.contaminationRisk}
@@ -300,13 +307,13 @@ const SettingsScreen = ({ navigation }) => {
             </View>
 
             {/* Tank Level Alerts */}
-            <View className="flex-row items-center mb-4 pb-4 border-b border-slate-100">
+            <View className="flex-row items-center mb-4 pb-4" style={{ borderBottomWidth: 1, borderBottomColor: theme.colors.border }}>
               <View className="w-10 h-10 rounded-xl bg-blue-50 justify-center items-center mr-3">
                 <MaterialCommunityIcons name="cup-water" size={20} color="#3B82F6" />
               </View>
               <View className="flex-1">
-                <Text className="text-base font-semibold text-slate-800">Tank level alerts</Text>
-                <Text className="text-xs text-slate-500">Empty, low, full or overflowing</Text>
+                <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>Tank level alerts</Text>
+                <Text className="text-xs" style={{ color: theme.colors.textSecondary }}>Empty, low, full or overflowing</Text>
               </View>
               <Switch
                 value={settings.tankLevelAlerts}
@@ -322,8 +329,8 @@ const SettingsScreen = ({ navigation }) => {
                 <MaterialIcons name="notifications-none" size={20} color="#0891B2" />
               </View>
               <View className="flex-1">
-                <Text className="text-base font-semibold text-slate-800">Push notifications</Text>
-                <Text className="text-xs text-slate-500">Receive alerts on this device</Text>
+                <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>Push notifications</Text>
+                <Text className="text-xs" style={{ color: theme.colors.textSecondary }}>Receive alerts on this device</Text>
               </View>
               <Switch
                 value={settings.pushNotifications}
@@ -337,22 +344,23 @@ const SettingsScreen = ({ navigation }) => {
 
         {/* Account */}
         <View className="px-5 mb-5">
-          <Text className="text-xs font-semibold text-slate-400 tracking-wider mb-4">ACCOUNT</Text>
+          <Text className="text-xs font-semibold tracking-wider mb-4" style={{ color: theme.colors.textTertiary }}>ACCOUNT</Text>
           
-          <View className="bg-white rounded-2xl shadow-sm overflow-hidden">
+          <View className="rounded-2xl shadow-sm overflow-hidden" style={{ backgroundColor: theme.colors.cardBackground }}>
             {/* View History */}
             <TouchableOpacity 
-              className="flex-row items-center p-4 border-b border-slate-100"
+              className="flex-row items-center p-4"
+              style={{ borderBottomWidth: 1, borderBottomColor: theme.colors.border }}
               onPress={handleViewHistory}
             >
               <View className="w-10 h-10 rounded-xl bg-cyan-50 justify-center items-center mr-3">
                 <MaterialIcons name="access-time" size={20} color="#0891B2" />
               </View>
               <View className="flex-1">
-                <Text className="text-base font-semibold text-slate-800">View History</Text>
-                <Text className="text-xs text-slate-500">Past water checks</Text>
+                <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>View History</Text>
+                <Text className="text-xs" style={{ color: theme.colors.textSecondary }}>Past water checks</Text>
               </View>
-              <MaterialIcons name="chevron-right" size={24} color="#94A3B8" />
+              <MaterialIcons name="chevron-right" size={24} color={theme.colors.textTertiary} />
             </TouchableOpacity>
 
             {/* Export Data */}
@@ -364,10 +372,10 @@ const SettingsScreen = ({ navigation }) => {
                 <MaterialIcons name="file-download" size={20} color="#10B981" />
               </View>
               <View className="flex-1">
-                <Text className="text-base font-semibold text-slate-800">Export Data</Text>
-                <Text className="text-xs text-slate-500">Download as PDF or CSV</Text>
+                <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>Export Data</Text>
+                <Text className="text-xs" style={{ color: theme.colors.textSecondary }}>Download as PDF or CSV</Text>
               </View>
-              <MaterialIcons name="chevron-right" size={24} color="#94A3B8" />
+              <MaterialIcons name="chevron-right" size={24} color={theme.colors.textTertiary} />
             </TouchableOpacity>
           </View>
         </View>
