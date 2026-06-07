@@ -14,6 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { LineChart } from 'react-native-chart-kit';
 import { useTheme } from '../context/ThemeContext';
+import { TOKEN_KEY } from '../services/api';
 
 const API_BASE_URL = 'http://10.0.2.2:8000/api/v1';
 const screenWidth = Dimensions.get('window').width;
@@ -32,7 +33,7 @@ const HistoryScreen = ({ navigation }) => {
 
   const fetchHistoryData = async () => {
     try {
-      const token = await AsyncStorage.getItem('@access_token');
+      const token = await AsyncStorage.getItem(TOKEN_KEY);
       
       if (!token) {
         return;
@@ -198,6 +199,7 @@ const HistoryScreen = ({ navigation }) => {
       
       <ScrollView 
         showsVerticalScrollIndicator={false}
+        bounces={false}
         contentContainerStyle={{ flexGrow: 1 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0891B2']} />

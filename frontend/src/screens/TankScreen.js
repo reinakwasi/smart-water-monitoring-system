@@ -11,6 +11,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
+import { TOKEN_KEY } from '../services/api';
 
 const API_BASE_URL = 'http://10.0.2.2:8000/api/v1';
 
@@ -35,7 +36,7 @@ const TankScreen = ({ navigation }) => {
 
   const fetchTankStatus = async () => {
     try {
-      const token = await AsyncStorage.getItem('@access_token');
+      const token = await AsyncStorage.getItem(TOKEN_KEY);
       
       if (!token) {
         return;
@@ -122,6 +123,7 @@ const TankScreen = ({ navigation }) => {
       
       <ScrollView 
         showsVerticalScrollIndicator={false}
+        bounces={false}
         contentContainerStyle={{ flexGrow: 1 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0891B2']} />

@@ -224,7 +224,7 @@ const ResetPasswordScreen = ({ navigation, route }) => {
         <Text className="text-base text-cyan-100">Enter the code and your new password</Text>
       </View>
 
-      <ScrollView className="flex-1 rounded-t-3xl -mt-5 px-6 pt-8" style={{ backgroundColor: theme.colors.background }} showsVerticalScrollIndicator={false}>
+      <ScrollView className="flex-1 rounded-t-3xl -mt-5 px-6 pt-8" style={{ backgroundColor: theme.colors.background }} showsVerticalScrollIndicator={false} bounces={false}>
         <View className="rounded-2xl p-4 mb-6 flex-row" style={{ backgroundColor: theme.isDarkMode ? '#1E40AF' : '#DBEAFE' }}>
           <View className="w-12 h-12 rounded-xl bg-cyan-100 justify-center items-center mr-3">
             <MaterialCommunityIcons name="shield-lock-outline" size={24} color="#0891B2" />

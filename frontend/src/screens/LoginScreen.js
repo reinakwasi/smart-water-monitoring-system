@@ -21,6 +21,7 @@ const LoginScreen = ({ navigation }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     loadSavedCredentials();
@@ -51,23 +52,34 @@ const LoginScreen = ({ navigation }) => {
   };
 
   const handleSignIn = async () => {
+    // Clear any previous error
+    setErrorMessage('');
+
     if (!email.trim()) {
-      Alert.alert('Validation Error', 'Please enter your email address');
+      const msg = 'Please enter your email address';
+      setErrorMessage(msg);
+      Alert.alert('Validation Error', msg);
       return;
     }
 
     if (!validateEmail(email)) {
-      Alert.alert('Invalid Email', 'Please enter a valid email address');
+      const msg = 'Please enter a valid email address';
+      setErrorMessage(msg);
+      Alert.alert('Invalid Email', msg);
       return;
     }
 
     if (!password) {
-      Alert.alert('Validation Error', 'Please enter your password');
+      const msg = 'Please enter your password';
+      setErrorMessage(msg);
+      Alert.alert('Validation Error', msg);
       return;
     }
 
     if (password.length < 8) {
-      Alert.alert('Invalid Password', 'Password must be at least 8 characters');
+      const msg = 'Password must be at least 8 characters';
+      setErrorMessage(msg);
+      Alert.alert('Invalid Password', msg);
       return;
     }
 
@@ -80,7 +92,6 @@ const LoginScreen = ({ navigation }) => {
       });
 
       await AsyncStorage.setItem('@saved_email', email.trim().toLowerCase());
-      await AsyncStorage.setItem('@user_name', response.user.full_name);
       
       if (rememberMe) {
         await AsyncStorage.setItem('@saved_password', password);
@@ -93,19 +104,23 @@ const LoginScreen = ({ navigation }) => {
       navigation.replace('MainApp');
 
     } catch (error) {
-      console.error('Login error:', error);
-
-      if (error.response?.status === 401) {
-        Alert.alert('Login Failed', 'Invalid email or password. Please try again.');
-      } else if (error.response?.status === 403) {
-        Alert.alert('Account Not Verified', 'Please verify your email before signing in.');
-      } else if (error.response?.data?.detail) {
-        Alert.alert('Login Failed', error.response.data.detail);
-      } else if (error.message === 'Network Error') {
-        Alert.alert('Connection Error', 'Cannot connect to server. Please check your internet connection.');
-      } else {
-        Alert.alert('Login Failed', 'An error occurred. Please try again later.');
+      let errorMsg = 'An error occurred. Please try again later.';
+      
+      if (error.response?.data?.detail) {
+        errorMsg = error.response.data.detail;
       }
+      else if (error.message === 'Network Error' || error.code === 'ERR_NETWORK') {
+        errorMsg = 'Cannot connect to server. Please check your internet connection and ensure the backend is running.';
+      }
+      else if (error.response?.status === 401) {
+        errorMsg = 'Invalid email or password. Please try again.';
+      } else if (error.response?.status === 403) {
+        errorMsg = 'Access forbidden. Please verify your email before signing in.';
+      } else if (error.response?.status === 500) {
+        errorMsg = 'Server error. Please try again later.';
+      }
+      
+      setErrorMessage(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -145,7 +160,15 @@ const LoginScreen = ({ navigation }) => {
       </View>
 
       {/* Form Section */}
-      <ScrollView className="flex-1 bg-white rounded-t-3xl -mt-5 px-6 pt-8" showsVerticalScrollIndicator={false}>
+      <ScrollView className="flex-1 bg-white rounded-t-3xl -mt-5 px-6 pt-8" showsVerticalScrollIndicator={false} bounces={false}>
+        {/* Error Message Banner */}
+        {errorMessage ? (
+          <View className="bg-red-50 border border-red-200 rounded-xl p-4 mb-5 flex-row items-center">
+            <MaterialIcons name="error-outline" size={20} color="#DC2626" />
+            <Text className="text-red-600 text-sm ml-2 flex-1">{errorMessage}</Text>
+          </View>
+        ) : null}
+
         {/* Email Input */}
         <View className="mb-5">
           <Text className="text-xs font-semibold text-slate-600 mb-2.5 tracking-wider">EMAIL ADDRESS</Text>
@@ -153,7 +176,7 @@ const LoginScreen = ({ navigation }) => {
             <MaterialCommunityIcons name="email-outline" size={20} color="#94A3B8" className="mr-3" />
             <TextInput
               className="flex-1 text-base text-slate-800"
-              placeholder="samuel@email.com"
+              placeholder="Enter your email"
               placeholderTextColor="#94A3B8"
               value={email}
               onChangeText={setEmail}

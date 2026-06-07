@@ -433,6 +433,9 @@ class UserResponse(BaseModel):
     email: str = Field(..., description="User email")
     full_name: str = Field(..., description="User full name")
     role: UserRole = Field(..., description="User role")
+    phone: Optional[str] = Field(None, description="User phone number")
+    location: Optional[str] = Field(None, description="User location")
+    profile_picture: Optional[str] = Field(None, description="User profile picture (base64)")
     created_at: datetime = Field(..., description="Account creation timestamp")
 
 
@@ -442,6 +445,14 @@ class TokenResponse(BaseModel):
     token_type: str = Field(default="bearer", description="Token type")
     expires_in: int = Field(..., description="Token expiration time in seconds")
     user: UserResponse = Field(..., description="User information")
+
+
+class UpdateProfileRequest(BaseModel):
+    """Update user profile request"""
+    full_name: Optional[str] = Field(None, min_length=2, max_length=100, description="User full name")
+    phone: Optional[str] = Field(None, max_length=20, description="User phone number")
+    location: Optional[str] = Field(None, max_length=200, description="User location")
+    profile_picture: Optional[str] = Field(None, description="User profile picture (base64)")
 
 
 # ============================================================================

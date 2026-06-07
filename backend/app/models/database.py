@@ -107,20 +107,21 @@ class UserDocument(BaseModel):
     
     Collection: users    """
     email: str
-    password_hash: str  # bcrypt hashed password
+    password_hash: str
     full_name: str
-    role: str  # user, admin
+    role: str
     
-    # FCM token for push notifications
+    phone: Optional[str] = None
+    location: Optional[str] = None
+    profile_picture: Optional[str] = None
+    
     fcm_token: Optional[str] = None
     
-    # Notification preferences
-    alert_on_unsafe: bool = True  # Alert when water quality is Unsafe
-    alert_on_high_risk: bool = True  # Alert when contamination risk is High
-    alert_on_tank_critical: bool = True  # Alert on Empty/Overflow tank status
-    push_enabled: bool = True  # Enable/disable push notifications
+    alert_on_unsafe: bool = True
+    alert_on_high_risk: bool = True
+    alert_on_tank_critical: bool = True
+    push_enabled: bool = True
     
-    # Metadata
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     last_login: Optional[datetime] = None
@@ -133,6 +134,9 @@ class UserDocument(BaseModel):
                 "password_hash": "$2b$12$...",
                 "full_name": "John Doe",
                 "role": "user",
+                "phone": "+1234567890",
+                "location": "New York, USA",
+                "profile_picture": "base64_encoded_image",
                 "fcm_token": "fcm_token_here",
                 "created_at": "2025-01-15T10:00:00Z",
                 "updated_at": "2025-01-15T10:00:00Z",

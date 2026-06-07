@@ -12,32 +12,36 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
+import { TOKEN_KEY } from '../services/api';
+import { loadUserProfile, getFirstName } from '../utils/profileLoader';
 
 const API_BASE_URL = 'http://10.0.2.2:8000/api/v1';
 
 const HomeScreen = ({ navigation }) => {
   const { theme } = useTheme();
   const [greeting, setGreeting] = useState('');
-  const [userName, setUserName] = useState('Samuel');
+  const [userName, setUserName] = useState('User');
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [dataError, setDataError] = useState(null);
   
   const [waterQuality, setWaterQuality] = useState({
-    classification: 'Safe to drink',
-    confidence: 0,
+    classification: 'Loading...',
+    confidence: null,
     parameters: {
-      ph: 0,
-      turbidity: 0,
-      temperature: 0,
-      tds: 0,
+      ph: null,
+      turbidity: null,
+      temperature: null,
+      tds: null,
     },
     timestamp: new Date()
   });
   
   const [tankStatus, setTankStatus] = useState({
-    level_percent: 0,
-    volume_liters: 0,
+    level_percent: null,
+    volume_liters: null,
     total_capacity: 500,
-    status: 'Half full',
+    status: 'Loading...',
   });
   
   const [esp32Connected, setEsp32Connected] = useState(false);
@@ -51,13 +55,11 @@ const HomeScreen = ({ navigation }) => {
 
   const loadUserName = async () => {
     try {
-      const name = await AsyncStorage.getItem('@user_name');
-      if (name) {
-        const firstName = name.split(' ')[0];
-        setUserName(firstName);
-      }
+      const profileData = await loadUserProfile();
+      const firstName = getFirstName(profileData.fullName);
+      setUserName(firstName);
     } catch (error) {
-      console.error('Error loading user name:', error);
+      setUserName('User');
     }
   };
 
@@ -81,10 +83,12 @@ const HomeScreen = ({ navigation }) => {
 
   const fetchCurrentStatus = async () => {
     try {
-      const token = await AsyncStorage.getItem('@access_token');
+      const token = await AsyncStorage.getItem(TOKEN_KEY);
       
       if (!token) {
         setEsp32Connected(false);
+        setLoading(false);
+        setDataError('Please login to view sensor data');
         return;
       }
 
@@ -122,15 +126,23 @@ const HomeScreen = ({ navigation }) => {
       
       const isConnected = minutesAgo < 5;
       setEsp32Connected(isConnected);
-      
-      console.log('ESP32 Connection Status:', {
-        lastUpdate: lastUpdate.toISOString(),
-        minutesAgo,
-        isConnected: isConnected ? 'CONNECTED' : 'DISCONNECTED'
-      });
+      setLoading(false);
+      setDataError(null);
     } catch (error) {
-      console.error('Backend connection error:', error.message);
       setEsp32Connected(false);
+      setLoading(false);
+      
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        setDataError('Server request timed out. Please check your connection.');
+      } else if (error.message === 'Network Error' || error.code === 'ERR_NETWORK') {
+        setDataError('Cannot connect to server. Please ensure backend is running.');
+      } else if (error.response?.status === 401) {
+        setDataError('Session expired. Please login again.');
+      } else if (error.response?.status === 404) {
+        setDataError('No sensor data available. Please add sample data.');
+      } else {
+        setDataError(`Error loading data: ${error.message}`);
+      }
     }
   };
 
@@ -197,6 +209,7 @@ const HomeScreen = ({ navigation }) => {
       
       <ScrollView 
         showsVerticalScrollIndicator={false}
+        bounces={false}
         contentContainerStyle={{ flexGrow: 1 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0891B2']} />
@@ -227,7 +240,7 @@ const HomeScreen = ({ navigation }) => {
 
           {/* Confidence Badge */}
           <View className="absolute top-5 right-5 bg-white/25 px-4 py-3 rounded-xl items-center">
-            <Text className="text-2xl font-bold text-white">{waterQuality.confidence}%</Text>
+            <Text className="text-2xl font-bold text-white">{waterQuality.confidence !== null ? waterQuality.confidence : '--'}%</Text>
             <Text className="text-xs text-cyan-100 font-semibold tracking-wide">SURE</Text>
           </View>
 
@@ -264,10 +277,10 @@ const HomeScreen = ({ navigation }) => {
             <View className="absolute top-4 right-4 w-2 h-2 rounded-full bg-green-500" />
             <Text className="text-xs mb-1" style={{ color: theme.colors.textSecondary }}>pH Sensor</Text>
             <Text className="text-3xl font-bold mb-0.5" style={{ color: theme.colors.text }}>
-              {waterQuality.parameters.ph.toFixed(1)}<Text className="text-base font-normal" style={{ color: theme.colors.textTertiary }}>pH</Text>
+              {waterQuality.parameters.ph !== null ? waterQuality.parameters.ph.toFixed(1) : '--'}<Text className="text-base font-normal" style={{ color: theme.colors.textTertiary }}>pH</Text>
             </Text>
-            <Text className={`text-xs font-medium ${getParameterStatus('ph', waterQuality.parameters.ph).color}`}>
-              {getParameterStatus('ph', waterQuality.parameters.ph).text}
+            <Text className={`text-xs font-medium ${waterQuality.parameters.ph !== null ? getParameterStatus('ph', waterQuality.parameters.ph).color : 'text-gray-400'}`}>
+              {waterQuality.parameters.ph !== null ? getParameterStatus('ph', waterQuality.parameters.ph).text : 'Loading...'}
             </Text>
           </View>
 
@@ -279,10 +292,10 @@ const HomeScreen = ({ navigation }) => {
             <View className="absolute top-4 right-4 w-2 h-2 rounded-full bg-green-500" />
             <Text className="text-xs mb-1" style={{ color: theme.colors.textSecondary }}>Turbidity</Text>
             <Text className="text-3xl font-bold mb-0.5" style={{ color: theme.colors.text }}>
-              {waterQuality.parameters.turbidity.toFixed(1)}<Text className="text-base font-normal" style={{ color: theme.colors.textTertiary }}>NTU</Text>
+              {waterQuality.parameters.turbidity !== null ? waterQuality.parameters.turbidity.toFixed(1) : '--'}<Text className="text-base font-normal" style={{ color: theme.colors.textTertiary }}>NTU</Text>
             </Text>
-            <Text className={`text-xs font-medium ${getParameterStatus('turbidity', waterQuality.parameters.turbidity).color}`}>
-              {getParameterStatus('turbidity', waterQuality.parameters.turbidity).text}
+            <Text className={`text-xs font-medium ${waterQuality.parameters.turbidity !== null ? getParameterStatus('turbidity', waterQuality.parameters.turbidity).color : 'text-gray-400'}`}>
+              {waterQuality.parameters.turbidity !== null ? getParameterStatus('turbidity', waterQuality.parameters.turbidity).text : 'Loading...'}
             </Text>
           </View>
 
@@ -294,10 +307,10 @@ const HomeScreen = ({ navigation }) => {
             <View className="absolute top-4 right-4 w-2 h-2 rounded-full bg-green-500" />
             <Text className="text-xs mb-1" style={{ color: theme.colors.textSecondary }}>TDS Meter</Text>
             <Text className="text-3xl font-bold mb-0.5" style={{ color: theme.colors.text }}>
-              {Math.round(waterQuality.parameters.tds)}<Text className="text-base font-normal" style={{ color: theme.colors.textTertiary }}>ppm</Text>
+              {waterQuality.parameters.tds !== null ? Math.round(waterQuality.parameters.tds) : '--'}<Text className="text-base font-normal" style={{ color: theme.colors.textTertiary }}>ppm</Text>
             </Text>
-            <Text className={`text-xs font-medium ${getParameterStatus('tds', waterQuality.parameters.tds).color}`}>
-              {getParameterStatus('tds', waterQuality.parameters.tds).text}
+            <Text className={`text-xs font-medium ${waterQuality.parameters.tds !== null ? getParameterStatus('tds', waterQuality.parameters.tds).color : 'text-gray-400'}`}>
+              {waterQuality.parameters.tds !== null ? getParameterStatus('tds', waterQuality.parameters.tds).text : 'Loading...'}
             </Text>
           </View>
 
@@ -306,13 +319,13 @@ const HomeScreen = ({ navigation }) => {
             <View className="w-12 h-12 rounded-xl bg-yellow-50 justify-center items-center mb-3">
               <MaterialCommunityIcons name="thermometer" size={24} color="#F59E0B" />
             </View>
-            <View className={`absolute top-4 right-4 w-2 h-2 rounded-full ${getParameterStatus('temperature', waterQuality.parameters.temperature).color === 'text-orange-500' ? 'bg-orange-500' : 'bg-green-500'}`} />
+            <View className={`absolute top-4 right-4 w-2 h-2 rounded-full ${waterQuality.parameters.temperature !== null && getParameterStatus('temperature', waterQuality.parameters.temperature).color === 'text-orange-500' ? 'bg-orange-500' : 'bg-green-500'}`} />
             <Text className="text-xs mb-1" style={{ color: theme.colors.textSecondary }}>Temperature</Text>
             <Text className="text-3xl font-bold mb-0.5" style={{ color: theme.colors.text }}>
-              {Math.round(waterQuality.parameters.temperature)}<Text className="text-base font-normal" style={{ color: theme.colors.textTertiary }}>°C</Text>
+              {waterQuality.parameters.temperature !== null ? Math.round(waterQuality.parameters.temperature) : '--'}<Text className="text-base font-normal" style={{ color: theme.colors.textTertiary }}>°C</Text>
             </Text>
-            <Text className={`text-xs font-medium ${getParameterStatus('temperature', waterQuality.parameters.temperature).color}`}>
-              {getParameterStatus('temperature', waterQuality.parameters.temperature).text}
+            <Text className={`text-xs font-medium ${waterQuality.parameters.temperature !== null ? getParameterStatus('temperature', waterQuality.parameters.temperature).color : 'text-gray-400'}`}>
+              {waterQuality.parameters.temperature !== null ? getParameterStatus('temperature', waterQuality.parameters.temperature).text : 'Loading...'}
             </Text>
           </View>
         </View>
@@ -330,14 +343,14 @@ const HomeScreen = ({ navigation }) => {
           <View className="flex-row justify-between items-center">
             <View className="flex-1">
               <Text className="text-sm mb-2" style={{ color: theme.colors.textSecondary }}>Current water level</Text>
-              <Text className="text-5xl font-bold mb-1" style={{ color: theme.colors.text }}>{tankStatus.level_percent}%</Text>
+              <Text className="text-5xl font-bold mb-1" style={{ color: theme.colors.text }}>{tankStatus.level_percent !== null ? tankStatus.level_percent : '--'}%</Text>
               <Text className="text-xs text-green-500 font-medium">
-                • {tankStatus.volume_liters}L of {tankStatus.total_capacity}L · {tankStatus.status}
+                • {tankStatus.volume_liters !== null ? tankStatus.volume_liters : '--'}L of {tankStatus.total_capacity}L · {tankStatus.status}
               </Text>
             </View>
             <View className="ml-4">
               <View className="w-16 h-24 rounded-2xl border-2 overflow-hidden justify-end" style={{ borderColor: theme.colors.border, backgroundColor: theme.isDarkMode ? '#0F172A' : '#F8FAFC' }}>
-                <View className="w-full bg-[#0B7FA5] rounded-lg" style={{ height: `${tankStatus.level_percent}%` }} />
+                <View className="w-full bg-[#0B7FA5] rounded-lg" style={{ height: tankStatus.level_percent !== null ? `${tankStatus.level_percent}%` : '0%' }} />
               </View>
             </View>
           </View>

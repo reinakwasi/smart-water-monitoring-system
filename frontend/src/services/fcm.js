@@ -9,7 +9,6 @@ export const requestNotificationPermission = async () => {
       );
       return granted === PermissionsAndroid.RESULTS.GRANTED;
     } catch (error) {
-      console.error('Error requesting notification permission:', error);
       return false;
     }
   }
@@ -20,51 +19,55 @@ export const getFCMToken = async () => {
   try {
     const hasPermission = await requestNotificationPermission();
     if (!hasPermission) {
-      console.log('Notification permission denied');
       return null;
     }
 
-    const token = await messaging().getToken();
-    console.log('FCM Token:', token);
+    const messagingInstance = messaging();
+    const token = await messagingInstance.getToken();
     return token;
   } catch (error) {
-    console.error('Error getting FCM token:', error);
     return null;
   }
 };
 
 export const setupFCMListeners = () => {
-  messaging().onMessage(async remoteMessage => {
-    console.log('Foreground message received:', JSON.stringify(remoteMessage, null, 2));
+  const messagingInstance = messaging();
+  
+  const unsubscribeOnMessage = messagingInstance.onMessage(async remoteMessage => {
+    
   });
 
-  messaging().setBackgroundMessageHandler(async remoteMessage => {
-    console.log('Background message received:', JSON.stringify(remoteMessage, null, 2));
+  messagingInstance.setBackgroundMessageHandler(async remoteMessage => {
+    
   });
 
-  messaging().onNotificationOpenedApp(remoteMessage => {
-    console.log('Notification opened app:', JSON.stringify(remoteMessage, null, 2));
+  const unsubscribeOnNotificationOpenedApp = messagingInstance.onNotificationOpenedApp(remoteMessage => {
+    
   });
 
-  messaging()
+  messagingInstance
     .getInitialNotification()
     .then(remoteMessage => {
       if (remoteMessage) {
-        console.log('App opened from notification (quit state):', JSON.stringify(remoteMessage, null, 2));
+        
       }
     });
 
-  messaging().onTokenRefresh(token => {
-    console.log('FCM token refreshed:', token);
+  const unsubscribeOnTokenRefresh = messagingInstance.onTokenRefresh(token => {
+    
   });
+
+  return () => {
+    unsubscribeOnMessage();
+    unsubscribeOnNotificationOpenedApp();
+    unsubscribeOnTokenRefresh();
+  };
 };
 
 export const registerTokenWithBackend = async (token, userId) => {
   try {
-    console.log('TODO: Register token with backend:', { token, userId });
     return true;
   } catch (error) {
-    console.error('Error registering token with backend:', error);
     return false;
   }
 };

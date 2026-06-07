@@ -8,11 +8,15 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
+  Image,
+  Platform,
+  PermissionsAndroid,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { useTheme } from '../context/ThemeContext';
+import { authAPI } from '../services/api';
 
 const EditProfileScreen = ({ navigation }) => {
   const { theme } = useTheme();
@@ -20,6 +24,7 @@ const EditProfileScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [location, setLocation] = useState('');
+  const [profileImage, setProfileImage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
 
@@ -29,29 +34,135 @@ const EditProfileScreen = ({ navigation }) => {
 
   const loadUserData = async () => {
     try {
-      const userName = await AsyncStorage.getItem('@user_name');
-      const userEmail = await AsyncStorage.getItem('@user_email');
-      const userPhone = await AsyncStorage.getItem('@user_phone');
-      const userLocation = await AsyncStorage.getItem('@user_location');
-
-      setFullName(userName || '');
-      setEmail(userEmail || '');
-      setPhoneNumber(userPhone || '');
-      setLocation(userLocation || '');
+      const profile = await authAPI.getProfile();
+      
+      setFullName(profile.full_name || '');
+      setEmail(profile.email || '');
+      setPhoneNumber(profile.phone || '');
+      setLocation(profile.location || '');
+      setProfileImage(profile.profile_picture || null);
     } catch (error) {
-      console.error('Error loading user data:', error);
+      Alert.alert('Error', 'Failed to load profile data. Please try again.');
     } finally {
       setInitialLoading(false);
     }
   };
 
   const getInitials = (name) => {
-    if (!name) return 'SA';
-    const names = name.trim().split(' ');
+    if (!name || !name.trim()) return 'U';
+    const names = name.trim().split(' ').filter(n => n.length > 0);
+    if (names.length === 0) return 'U';
     if (names.length === 1) {
-      return names[0].substring(0, 2).toUpperCase();
+      const firstName = names[0];
+      return firstName.length >= 2 
+        ? firstName.substring(0, 2).toUpperCase() 
+        : firstName.charAt(0).toUpperCase();
     }
     return (names[0][0] + names[names.length - 1][0]).toUpperCase();
+  };
+
+  const requestCameraPermission = async () => {
+    if (Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.CAMERA,
+          {
+            title: 'Camera Permission',
+            message: 'AquaGuard needs access to your camera to take profile photos',
+            buttonNeutral: 'Ask Me Later',
+            buttonNegative: 'Cancel',
+            buttonPositive: 'OK',
+          }
+        );
+        return granted === PermissionsAndroid.RESULTS.GRANTED;
+      } catch (err) {
+        console.warn(err);
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const handleImagePicker = () => {
+    Alert.alert(
+      'Profile Photo',
+      'Choose an option',
+      [
+        {
+          text: 'Take Photo',
+          onPress: handleTakePhoto,
+        },
+        {
+          text: 'Choose from Gallery',
+          onPress: handleChooseFromGallery,
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const handleTakePhoto = async () => {
+    const hasPermission = await requestCameraPermission();
+    
+    if (!hasPermission) {
+      Alert.alert('Permission Denied', 'Camera permission is required to take photos');
+      return;
+    }
+
+    const options = {
+      mediaType: 'photo',
+      quality: 0.8,
+      maxWidth: 500,
+      maxHeight: 500,
+      includeBase64: true,
+      saveToPhotos: false,
+    };
+
+    launchCamera(options, (response) => {
+      if (response.didCancel) {
+        return;
+      }
+
+      if (response.errorCode) {
+        Alert.alert('Error', 'Failed to take photo. Please try again.');
+        return;
+      }
+
+      if (response.assets && response.assets[0]) {
+        const base64Image = `data:${response.assets[0].type};base64,${response.assets[0].base64}`;
+        setProfileImage(base64Image);
+      }
+    });
+  };
+
+  const handleChooseFromGallery = () => {
+    const options = {
+      mediaType: 'photo',
+      quality: 0.8,
+      maxWidth: 500,
+      maxHeight: 500,
+      includeBase64: true,
+    };
+
+    launchImageLibrary(options, (response) => {
+      if (response.didCancel) {
+        return;
+      }
+
+      if (response.errorCode) {
+        Alert.alert('Error', 'Failed to select photo. Please try again.');
+        return;
+      }
+
+      if (response.assets && response.assets[0]) {
+        const base64Image = `data:${response.assets[0].type};base64,${response.assets[0].base64}`;
+        setProfileImage(base64Image);
+      }
+    });
   };
 
   const handleSaveChanges = async () => {
@@ -68,28 +179,20 @@ const EditProfileScreen = ({ navigation }) => {
     setLoading(true);
 
     try {
-      await AsyncStorage.setItem('@user_name', fullName.trim());
-      
-      if (phoneNumber.trim()) {
-        await AsyncStorage.setItem('@user_phone', phoneNumber.trim());
-      }
-      
-      if (location.trim()) {
-        await AsyncStorage.setItem('@user_location', location.trim());
-      }
+      await authAPI.updateProfile({
+        full_name: fullName.trim(),
+        phone: phoneNumber.trim() || null,
+        location: location.trim() || null,
+        profile_picture: profileImage || null,
+      });
 
-      Alert.alert(
-        'Success',
-        'Your profile has been updated successfully',
-        [
-          {
-            text: 'OK',
-            onPress: () => navigation.goBack()
-          }
-        ]
-      );
+      Alert.alert('Success', 'Profile updated successfully', [
+        {
+          text: 'OK',
+          onPress: () => navigation.goBack(),
+        },
+      ]);
     } catch (error) {
-      console.error('Error saving profile:', error);
       Alert.alert('Error', 'Failed to update profile. Please try again.');
     } finally {
       setLoading(false);
@@ -124,14 +227,29 @@ const EditProfileScreen = ({ navigation }) => {
         <Text className="text-base text-cyan-100">Update your account details</Text>
       </View>
 
-      <ScrollView className="flex-1 rounded-t-3xl -mt-5 px-6 pt-8" style={{ backgroundColor: theme.colors.background }} showsVerticalScrollIndicator={false}>
+      <ScrollView className="flex-1 rounded-t-3xl -mt-5 px-6 pt-8" style={{ backgroundColor: theme.colors.background }} showsVerticalScrollIndicator={false} bounces={false}>
         <View className="items-center mb-8">
-          <View className="w-24 h-24 rounded-full bg-[#0B7FA5] justify-center items-center relative">
-            <Text className="text-3xl font-bold text-white">{getInitials(fullName)}</Text>
-            <TouchableOpacity className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-white justify-center items-center shadow-lg">
+          <TouchableOpacity 
+            className="w-24 h-24 rounded-full bg-[#0B7FA5] justify-center items-center relative"
+            onPress={handleImagePicker}
+            activeOpacity={0.8}
+          >
+            {profileImage ? (
+              <Image 
+                source={{ uri: profileImage }} 
+                className="w-24 h-24 rounded-full"
+                resizeMode="cover"
+              />
+            ) : (
+              <Text className="text-3xl font-bold text-white">{getInitials(fullName)}</Text>
+            )}
+            <View className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-white justify-center items-center shadow-lg">
               <MaterialIcons name="photo-camera" size={16} color="#0B7FA5" />
-            </TouchableOpacity>
-          </View>
+            </View>
+          </TouchableOpacity>
+          <Text className="text-xs mt-2" style={{ color: theme.colors.textTertiary }}>
+            Tap to change photo
+          </Text>
         </View>
 
         <View className="mb-5">
@@ -143,7 +261,7 @@ const EditProfileScreen = ({ navigation }) => {
             <TextInput
               className="flex-1 text-base"
               style={{ color: theme.colors.text }}
-              placeholder="Samuel Antwi-Adjei"
+              placeholder="Your full name"
               placeholderTextColor={theme.colors.textTertiary}
               value={fullName}
               onChangeText={setFullName}
@@ -161,7 +279,7 @@ const EditProfileScreen = ({ navigation }) => {
             <TextInput
               className="flex-1 text-base"
               style={{ color: theme.isDarkMode ? '#94A3B8' : '#64748B' }}
-              placeholder="samuel@email.com"
+              placeholder="your.email@example.com"
               placeholderTextColor={theme.colors.textTertiary}
               value={email}
               editable={false}

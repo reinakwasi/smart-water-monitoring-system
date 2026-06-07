@@ -341,7 +341,7 @@ const SignUpScreen = ({ navigation }) => {
         <Text className="text-base text-cyan-100">Start your water monitoring journey</Text>
       </View>
 
-      <ScrollView className="flex-1 bg-white rounded-t-3xl -mt-5 px-6 pt-8">
+      <ScrollView className="flex-1 bg-white rounded-t-3xl -mt-5 px-6 pt-8" bounces={false}>
         <View className="mb-5">
           <Text className="text-xs font-semibold text-slate-600 mb-2.5 tracking-wider">FULL NAME</Text>
           <View className="flex-row items-center bg-slate-100 rounded-xl border border-slate-200 px-4 h-14">

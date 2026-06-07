@@ -3,8 +3,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const BASE_URL = 'http://10.0.2.2:8000';
 
-const TOKEN_KEY = '@water_quality_token';
-const REFRESH_TOKEN_KEY = '@water_quality_refresh_token';
+// Export AsyncStorage key constants for consistent usage across the app
+export const TOKEN_KEY = '@water_quality_token';
+export const REFRESH_TOKEN_KEY = '@water_quality_refresh_token';
+export const USER_NAME_KEY = '@user_name';
+export const USER_EMAIL_KEY = '@user_email';
+export const USER_PROFILE_KEY = '@user_profile';
 
 const apiClient = axios.create({
   baseURL: BASE_URL,
@@ -92,6 +96,18 @@ export const authAPI = {
       await AsyncStorage.setItem(REFRESH_TOKEN_KEY, refresh_token);
     }
     
+    // Store user information
+    if (user) {
+      if (user.full_name) {
+        await AsyncStorage.setItem('@user_name', user.full_name);
+      }
+      if (user.email) {
+        await AsyncStorage.setItem('@user_email', user.email);
+      }
+      // Store the entire user object as JSON
+      await AsyncStorage.setItem('@user_profile', JSON.stringify(user));
+    }
+    
     return response.data;
   },
 
@@ -124,6 +140,16 @@ export const authAPI = {
         new_password: newPassword
       }
     });
+    return response.data;
+  },
+
+  getProfile: async () => {
+    const response = await apiClient.get('/api/v1/auth/profile');
+    return response.data;
+  },
+
+  updateProfile: async (profileData) => {
+    const response = await apiClient.put('/api/v1/auth/profile', profileData);
     return response.data;
   },
 };

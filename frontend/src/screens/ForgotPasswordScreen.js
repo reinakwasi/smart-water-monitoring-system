@@ -93,7 +93,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
       </View>
 
       {/* Form Section */}
-      <ScrollView className="flex-1 rounded-t-3xl -mt-5 px-6 pt-8" style={{ backgroundColor: theme.colors.background }} showsVerticalScrollIndicator={false}>
+      <ScrollView className="flex-1 rounded-t-3xl -mt-5 px-6 pt-8" style={{ backgroundColor: theme.colors.background }} showsVerticalScrollIndicator={false} bounces={false}>
         {/* Info Card */}
         <View className="rounded-2xl p-4 mb-6 flex-row" style={{ backgroundColor: theme.isDarkMode ? '#1E40AF' : '#DBEAFE' }}>
           <View className="w-12 h-12 rounded-xl bg-cyan-100 justify-center items-center mr-3">

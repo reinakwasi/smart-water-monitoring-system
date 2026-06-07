@@ -7,12 +7,14 @@ import {
   TouchableOpacity,
   Switch,
   Alert,
+  Image,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
+import { authAPI, TOKEN_KEY } from '../services/api';
 
 const API_BASE_URL = 'http://10.0.2.2:8000/api/v1';
 
@@ -20,9 +22,10 @@ const SettingsScreen = ({ navigation }) => {
   const { theme, toggleDarkMode } = useTheme();
   
   const [userProfile, setUserProfile] = useState({
-    name: 'Samuel Antwi-Adjei',
-    email: 'samuel@email.com',
-    initials: 'SA',
+    name: 'User',
+    email: '',
+    initials: 'U',
+    profileImage: null,
   });
   
   const [esp32Status, setEsp32Status] = useState({
@@ -43,26 +46,31 @@ const SettingsScreen = ({ navigation }) => {
     loadUserProfile();
     loadSettings();
     checkESP32Status();
-  }, []);
+    
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadUserProfile();
+    });
+    
+    return unsubscribe;
+  }, [navigation]);
 
   const loadUserProfile = async () => {
     try {
-      const savedEmail = await AsyncStorage.getItem('@saved_email');
-      const savedName = await AsyncStorage.getItem('@user_name');
+      const profile = await authAPI.getProfile();
       
-      if (savedEmail && savedName) {
-        const nameParts = savedName.split(' ');
-        const firstName = nameParts[0] || 'User';
-        const lastName = nameParts[nameParts.length - 1] || '';
-        const initials = `${firstName.charAt(0).toUpperCase()}${lastName.charAt(0).toUpperCase() || firstName.charAt(1).toUpperCase()}`;
-        
-        setUserProfile({
-          name: savedName,
-          email: savedEmail,
-          initials: initials || 'U',
-        });
-      }
+      const nameParts = profile.full_name.split(' ');
+      const firstName = nameParts[0] || 'User';
+      const lastName = nameParts[nameParts.length - 1] || '';
+      const initials = `${firstName.charAt(0).toUpperCase()}${lastName.charAt(0).toUpperCase() || firstName.charAt(1).toUpperCase()}`;
+      
+      setUserProfile({
+        name: profile.full_name,
+        email: profile.email,
+        initials: initials || 'U',
+        profileImage: profile.profile_picture,
+      });
     } catch (error) {
+      // Silent failure - continue with defaults
     }
   };
 
@@ -87,9 +95,14 @@ const SettingsScreen = ({ navigation }) => {
 
   const checkESP32Status = async () => {
     try {
-      const token = await AsyncStorage.getItem('@access_token');
+      const token = await AsyncStorage.getItem(TOKEN_KEY);
       
       if (!token) {
+        setEsp32Status({
+          online: false,
+          wifiSignal: 'Offline',
+          lastSync: 'N/A',
+        });
         return;
       }
 
@@ -135,16 +148,12 @@ const SettingsScreen = ({ navigation }) => {
     navigation.navigate('EditProfile');
   };
 
-  const handleChangePassword = () => {
-    Alert.alert('Change Password', 'Password change feature coming soon');
-  };
-
   const handleViewHistory = () => {
     navigation.navigate('History');
   };
 
   const handleExportData = () => {
-    Alert.alert('Export Data', 'Data export feature coming soon. You will be able to download your water quality data as PDF or CSV.');
+    navigation.navigate('ExportData');
   };
 
   const handleSignOut = async () => {
@@ -158,11 +167,13 @@ const SettingsScreen = ({ navigation }) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await AsyncStorage.removeItem('@access_token');
-              await AsyncStorage.removeItem('@refresh_token');
+              await AsyncStorage.multiRemove([
+                '@water_quality_token',
+                '@water_quality_refresh_token'
+              ]);
               navigation.replace('Login');
             } catch (error) {
-              console.error('Error signing out:', error);
+              navigation.replace('Login');
             }
           },
         },
@@ -176,6 +187,7 @@ const SettingsScreen = ({ navigation }) => {
       
       <ScrollView 
         showsVerticalScrollIndicator={false}
+        bounces={false}
         contentContainerStyle={{ flexGrow: 1 }}
       >
         {/* Header */}
@@ -190,7 +202,15 @@ const SettingsScreen = ({ navigation }) => {
           
           <View className="items-center mb-4">
             <View className="w-20 h-20 rounded-full bg-white/20 border-2 border-white/40 justify-center items-center mb-3">
-              <Text className="text-3xl font-bold text-white">{userProfile.initials}</Text>
+              {userProfile.profileImage ? (
+                <Image 
+                  source={{ uri: userProfile.profileImage }} 
+                  className="w-20 h-20 rounded-full"
+                  resizeMode="cover"
+                />
+              ) : (
+                <Text className="text-3xl font-bold text-white">{userProfile.initials}</Text>
+              )}
             </View>
             <Text className="text-xl font-bold text-white mb-1">{userProfile.name}</Text>
             <Text className="text-sm text-cyan-100">{userProfile.email}</Text>
@@ -198,16 +218,10 @@ const SettingsScreen = ({ navigation }) => {
           
           <View className="flex-row justify-center">
             <TouchableOpacity 
-              className="bg-white/20 px-4 py-2 rounded-lg mr-2"
+              className="bg-white/20 px-6 py-2.5 rounded-lg"
               onPress={handleEditProfile}
             >
               <Text className="text-sm font-semibold text-white">Edit Profile</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              className="bg-white/20 px-4 py-2 rounded-lg ml-2"
-              onPress={handleChangePassword}
-            >
-              <Text className="text-sm font-semibold text-white">Change Password</Text>
             </TouchableOpacity>
           </View>
         </View>

@@ -7,6 +7,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { getFCMToken, setupFCMListeners } from './src/services/fcm';
 import { ThemeProvider } from './src/context/ThemeContext';
+import { setAlertHandler } from './src/utils/alertHelper';
+import CustomAlert from './src/components/CustomAlert';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 import SignUpScreen from './src/screens/SignUpScreen';
 import OTPVerificationScreen from './src/screens/OTPVerificationScreen';
@@ -20,6 +22,7 @@ import HistoryScreen from './src/screens/HistoryScreen';
 import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
 import ResetPasswordScreen from './src/screens/ResetPasswordScreen';
 import EditProfileScreen from './src/screens/EditProfileScreen';
+import ExportDataScreen from './src/screens/ExportDataScreen';
 
 const { width, height } = Dimensions.get('window');
 const ONBOARDING_COMPLETED_KEY = '@onboarding_completed';
@@ -93,6 +96,13 @@ function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [alertConfig, setAlertConfig] = useState({ visible: false });
+
+  useEffect(() => {
+    setAlertHandler((config) => {
+      setAlertConfig({ ...config, visible: true });
+    });
+  }, []);
 
   useEffect(() => {
     const checkOnboardingStatus = async () => {
@@ -175,8 +185,17 @@ function App() {
           <Stack.Screen name="MainApp" component={MainTabs} />
           <Stack.Screen name="History" component={HistoryScreen} />
           <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+          <Stack.Screen name="ExportData" component={ExportDataScreen} />
         </Stack.Navigator>
       </NavigationContainer>
+      <CustomAlert
+        visible={alertConfig.visible}
+        type={alertConfig.type}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        buttons={alertConfig.buttons}
+        onDismiss={() => setAlertConfig({ visible: false })}
+      />
     </ThemeProvider>
   );
 }

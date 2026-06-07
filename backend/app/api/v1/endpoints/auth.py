@@ -529,3 +529,145 @@ async def reset_password(
     
     return {"message": "Password reset successfully", "email": email}
 
+
+
+@router.get(
+    "/profile",
+    response_model=UserResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        200: {"description": "User profile retrieved successfully"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "User not found"}
+    }
+)
+async def get_profile(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(mongodb.get_database)
+):
+    """
+    Get current user profile
+    
+    Returns the authenticated user's profile information including
+    phone, location, and profile picture.
+    
+    Args:
+        current_user: Authenticated user from JWT token
+        db: MongoDB database instance
+        
+    Returns:
+        UserResponse with complete user profile
+    """
+    try:
+        user = await db.users.find_one({"email": current_user.get("email")})
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        return UserResponse(
+            user_id=str(user["_id"]),
+            email=user["email"],
+            full_name=user["full_name"],
+            role=user["role"],
+            phone=user.get("phone"),
+            location=user.get("location"),
+            profile_picture=user.get("profile_picture"),
+            created_at=user["created_at"]
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving profile: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve profile"
+        )
+
+
+@router.put(
+    "/profile",
+    response_model=UserResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        200: {"description": "Profile updated successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid request data"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "User not found"}
+    }
+)
+async def update_profile(
+    profile_data: dict,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(mongodb.get_database)
+):
+    """
+    Update current user profile
+    
+    Updates the authenticated user's profile information.
+    Only provided fields will be updated.
+    
+    Args:
+        profile_data: Profile update data (full_name, phone, location, profile_picture)
+        current_user: Authenticated user from JWT token
+        db: MongoDB database instance
+        
+    Returns:
+        UserResponse with updated user profile
+    """
+    try:
+        update_data = {}
+        
+        if "full_name" in profile_data and profile_data["full_name"]:
+            update_data["full_name"] = profile_data["full_name"]
+        
+        if "phone" in profile_data:
+            update_data["phone"] = profile_data["phone"]
+        
+        if "location" in profile_data:
+            update_data["location"] = profile_data["location"]
+        
+        if "profile_picture" in profile_data:
+            update_data["profile_picture"] = profile_data["profile_picture"]
+        
+        if not update_data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No valid fields to update"
+            )
+        
+        update_data["updated_at"] = datetime.utcnow()
+        
+        result = await db.users.update_one(
+            {"email": current_user.get("email")},
+            {"$set": update_data}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        user = await db.users.find_one({"email": current_user.get("email")})
+        
+        return UserResponse(
+            user_id=str(user["_id"]),
+            email=user["email"],
+            full_name=user["full_name"],
+            role=user["role"],
+            phone=user.get("phone"),
+            location=user.get("location"),
+            profile_picture=user.get("profile_picture"),
+            created_at=user["created_at"]
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating profile: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update profile"
+        )
