@@ -151,21 +151,24 @@ async def get_current_status(
         )
         
         if latest_tank_reading is None:
-            logger.warning("No tank readings found in database")
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="No tank level data available. Please ensure tank sensor is transmitting data."
-            )
-        
-        logger.debug(
-            f"Found latest tank reading from {latest_tank_reading['timestamp']}",
-            extra={
-                "extra_fields": {
-                    "device_id": latest_tank_reading["device_id"],
-                    "timestamp": latest_tank_reading["timestamp"].isoformat()
-                }
+            # Allow the water-quality dashboard to work before a tank sensor is added.
+            latest_tank_reading = {
+                "tank_status": "Empty",
+                "level_percent": 0.0,
+                "volume_liters": 0.0,
+                "timestamp": latest_sensor_reading["timestamp"]
             }
-        )
+            logger.warning("No tank readings found; returning an empty tank placeholder")
+        else:
+            logger.debug(
+                f"Found latest tank reading from {latest_tank_reading['timestamp']}",
+                extra={
+                    "extra_fields": {
+                        "device_id": latest_tank_reading["device_id"],
+                        "timestamp": latest_tank_reading["timestamp"].isoformat()
+                    }
+                }
+            )
         
         # Step 3: Build water quality status
         classification_shap_factors = []
@@ -191,10 +194,10 @@ async def get_current_status(
             confidence=latest_sensor_reading.get("classification_confidence", 0.0),
             parameters={
                 "ph": latest_sensor_reading["ph"],
-                "turbidity": latest_sensor_reading["turbidity"],
+                "turbidity_index": latest_sensor_reading["turbidity_index"],
                 "temperature": latest_sensor_reading["temperature"],
                 "tds": latest_sensor_reading["tds"],
-                "dissolved_oxygen": latest_sensor_reading["dissolved_oxygen"]
+                "dissolved_oxygen": latest_sensor_reading.get("dissolved_oxygen", 8.5)
             },
             shap_explanation=SHAPExplanation(
                 shap_values=latest_sensor_reading.get("classification_shap_values", {}),
@@ -299,7 +302,7 @@ async def get_current_status(
 async def get_historical_data(
     start_date: datetime = Query(..., description="Start date for historical data (ISO8601 format)"),
     end_date: datetime = Query(..., description="End date for historical data (ISO8601 format)"),
-    parameter: Optional[str] = Query(None, description="Filter by specific parameter (ph, turbidity, temperature, tds, dissolved_oxygen, tank_level, all)"),
+    parameter: Optional[str] = Query(None, description="Filter by specific parameter (ph, turbidity_index, temperature, tds, tank_level, all)"),
     device_id: Optional[str] = Query(None, description="Filter by specific device ID"),
     limit: int = Query(1000, ge=1, le=10000, description="Maximum number of records to return"),
     current_user: dict = Depends(get_current_user),
@@ -368,7 +371,7 @@ async def get_historical_data(
             )
         
         # Validate parameter filter
-        valid_parameters = ["ph", "turbidity", "temperature", "tds", "dissolved_oxygen", "tank_level", "all", None]
+        valid_parameters = ["ph", "turbidity_index", "temperature", "tds", "tank_level", "all", None]
         if parameter not in valid_parameters:
             logger.warning(f"Invalid parameter filter: {parameter}")
             raise HTTPException(
@@ -433,13 +436,13 @@ async def get_historical_data(
             if parameter is None or parameter == "all":
                 parameters = {
                     "ph": sensor_reading["ph"],
-                    "turbidity": sensor_reading["turbidity"],
+                    "turbidity_index": sensor_reading["turbidity_index"],
                     "temperature": sensor_reading["temperature"],
                     "tds": sensor_reading["tds"],
-                    "dissolved_oxygen": sensor_reading["dissolved_oxygen"]
+                    "dissolved_oxygen": sensor_reading.get("dissolved_oxygen", 8.5)
                 }
-            elif parameter in ["ph", "turbidity", "temperature", "tds", "dissolved_oxygen"]:
-                parameters[parameter] = sensor_reading[parameter]
+            elif parameter in ["ph", "turbidity_index", "temperature", "tds", "dissolved_oxygen"]:
+                parameters[parameter] = sensor_reading.get(parameter, 8.5 if parameter == "dissolved_oxygen" else 0.0)
             
             # Get tank level if available and requested
             tank_level_percent = None

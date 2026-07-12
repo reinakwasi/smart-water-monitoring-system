@@ -14,7 +14,7 @@ import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
 import { TOKEN_KEY } from '../services/api';
 
-const API_BASE_URL = 'http://10.0.2.2:8000/api/v1';
+const API_BASE_URL = 'http://172.20.10.5:8080/api/v1';
 
 const ReportsScreen = ({ navigation }) => {
   const { theme } = useTheme();
@@ -121,7 +121,7 @@ const ReportsScreen = ({ navigation }) => {
     let riskScore = 0;
     
     if (params.ph < 6.5 || params.ph > 8.5) riskScore += 2;
-    if (params.turbidity > 5) riskScore += 3;
+    if (params.turbidity_index > 50) riskScore += 3;
     if (params.tds > 500) riskScore += 2;
     if (params.temperature > 30 || params.temperature < 15) riskScore += 1;
     
@@ -137,8 +137,8 @@ const ReportsScreen = ({ navigation }) => {
   const analyzeFactors = (params) => {
     const factors = {
       turbidity: {
-        value: (params.turbidity / 10) * 100,
-        level: params.turbidity > 5 ? 'Very high' : params.turbidity > 3 ? 'High' : params.turbidity > 1 ? 'Moderate' : 'Low'
+        value: params.turbidity_index,
+        level: params.turbidity_index > 50 ? 'Very high' : params.turbidity_index > 30 ? 'High' : params.turbidity_index > 10 ? 'Moderate' : 'Low'
       },
       ph: {
         value: Math.abs(params.ph - 7) * 20,

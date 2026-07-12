@@ -26,7 +26,7 @@ async def insert_sample_data():
         "device_id": "ESP32_001",
         "timestamp": datetime.utcnow(),
         "ph": 7.2,
-        "turbidity": 3.1,
+        "turbidity_index": 3.1,
         "temperature": 24.0,
         "tds": 312.0,
         "dissolved_oxygen": 8.5,
@@ -36,14 +36,14 @@ async def insert_sample_data():
         "risk_level": "Low",
         "classification_shap_values": {
             "ph": 0.05,
-            "turbidity": -0.02,
+            "turbidity_index": -0.02,
             "temperature": 0.01,
             "tds": -0.03,
             "dissolved_oxygen": 0.04
         },
         "risk_shap_values": {
             "ph": -0.01,
-            "turbidity": 0.02,
+            "turbidity_index": 0.02,
             "temperature": 0.01,
             "tds": 0.01,
             "dissolved_oxygen": -0.02
@@ -58,7 +58,7 @@ async def insert_sample_data():
     print(f"   Classification: {sensor_data['classification']}")
     print(f"   Confidence: {sensor_data['classification_confidence'] * 100}%")
     print(f"   pH: {sensor_data['ph']}")
-    print(f"   Turbidity: {sensor_data['turbidity']}")
+    print(f"   Turbidity Index: {sensor_data['turbidity']}")
     print(f"   Temperature: {sensor_data['temperature']}")
     print(f"   TDS: {sensor_data['tds']}")
     print()

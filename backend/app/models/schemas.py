@@ -49,20 +49,19 @@ class SensorDataRequest(BaseModel):
     
     Validates sensor readings are within physical measurement ranges:
     - pH: 0-14
-    - Turbidity: 0-3000 NTU
+    - Turbidity Index: 0-100 (self-calibrated relative scale, NOT certified NTU)
     - Temperature: -55 to 125°C
     - TDS: 0-1000 ppm
-    - Dissolved Oxygen: 0-20 mg/L
     
-    Requirements: 1.1-1.5, 1.9, 15.1, 15.7
+    Requirements: 1.1-1.4, 1.9, 15.1, 15.7
     """
     device_id: str = Field(..., min_length=1, max_length=100, description="Unique device identifier")
-    timestamp: datetime = Field(..., description="Reading timestamp in ISO8601 format")
+    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Reading timestamp; server time is used when the device omits it")
     ph: float = Field(..., ge=0.0, le=14.0, description="pH level (0-14)")
-    turbidity: float = Field(..., ge=0.0, le=3000.0, description="Turbidity in NTU (0-3000)")
+    turbidity_index: float = Field(..., ge=0.0, le=100.0, description="Turbidity index (0-100, self-calibrated relative scale, NOT certified NTU)")
     temperature: float = Field(..., ge=-55.0, le=125.0, description="Temperature in Celsius (-55 to 125)")
     tds: float = Field(..., ge=0.0, le=1000.0, description="Total Dissolved Solids in ppm (0-1000)")
-    dissolved_oxygen: float = Field(..., ge=0.0, le=20.0, description="Dissolved Oxygen in mg/L (0-20)")
+    dissolved_oxygen: float = Field(default=8.5, ge=0.0, le=20.0, description="Temporary model-compatibility value until a dissolved oxygen sensor is added")
     
     model_config = ConfigDict(
         json_schema_extra={
@@ -70,10 +69,9 @@ class SensorDataRequest(BaseModel):
                 "device_id": "ESP32_001",
                 "timestamp": "2025-01-15T10:30:00Z",
                 "ph": 7.2,
-                "turbidity": 15.5,
+                "turbidity_index": 15.5,
                 "temperature": 25.3,
-                "tds": 150.0,
-                "dissolved_oxygen": 8.5
+                "tds": 150.0
             }
         }
     )
@@ -84,10 +82,10 @@ class SensorDataRequest(BaseModel):
         """Validate pH precision to ±0.1 units (Requirement 1.1)"""
         return round(v, 1)
     
-    @field_validator('turbidity')
+    @field_validator('turbidity_index')
     @classmethod
-    def validate_turbidity_precision(cls, v: float) -> float:
-        """Validate turbidity precision to ±5 NTU (Requirement 1.2)"""
+    def validate_turbidity_index_precision(cls, v: float) -> float:
+        """Validate turbidity index precision to 0.1 units (self-calibrated relative scale)"""
         return round(v, 1)
     
     @field_validator('temperature')
@@ -101,19 +99,13 @@ class SensorDataRequest(BaseModel):
     def validate_tds_precision(cls, v: float) -> float:
         """Validate TDS precision to ±10 ppm (Requirement 1.4)"""
         return round(v, 0)
-    
-    @field_validator('dissolved_oxygen')
-    @classmethod
-    def validate_do_precision(cls, v: float) -> float:
-        """Validate dissolved oxygen precision to ±0.2 mg/L (Requirement 1.5)"""
-        return round(v, 1)
 
 
 class TankLevelRequest(BaseModel):
     """
     Request model for tank level data from ESP32    """
     device_id: str = Field(..., min_length=1, max_length=100, description="Unique device identifier")
-    timestamp: datetime = Field(..., description="Reading timestamp in ISO8601 format")
+    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Reading timestamp; server time is used when the device omits it")
     distance_cm: float = Field(..., ge=0.0, le=500.0, description="Distance from sensor to water surface in cm")
     tank_height_cm: float = Field(..., ge=0.0, le=500.0, description="Total tank height in cm")
     
@@ -169,8 +161,7 @@ class SHAPExplanation(BaseModel):
                     "ph": 0.12,
                     "turbidity": 0.45,
                     "temperature": -0.08,
-                    "tds": 0.23,
-                    "dissolved_oxygen": -0.15
+                    "tds": 0.23
                 },
                 "top_factors": [
                     {
@@ -182,11 +173,6 @@ class SHAPExplanation(BaseModel):
                         "feature": "tds",
                         "shap_value": 0.23,
                         "direction": "increasing_risk"
-                    },
-                    {
-                        "feature": "dissolved_oxygen",
-                        "shap_value": -0.15,
-                        "direction": "decreasing_risk"
                     }
                 ]
             }
@@ -507,9 +493,9 @@ class SystemConfigResponse(BaseModel):
                         "unsafe_min": 5.0,
                         "unsafe_max": 10.0
                     },
-                    "turbidity": {
-                        "safe_max": 5.0,
-                        "unsafe_max": 25.0
+                    "turbidity_index": {
+                        "safe_max": 10.0,
+                        "unsafe_max": 50.0
                     },
                     "temperature": {
                         "safe_min": 15.0,
@@ -520,10 +506,6 @@ class SystemConfigResponse(BaseModel):
                     "tds": {
                         "safe_max": 300.0,
                         "unsafe_max": 600.0
-                    },
-                    "dissolved_oxygen": {
-                        "safe_min": 6.0,
-                        "unsafe_min": 4.0
                     }
                 },
                 "risk_thresholds": {
@@ -598,10 +580,9 @@ class ConfigUpdateResponse(BaseModel):
 class SensorType(str, Enum):
     """Sensor types for calibration"""
     PH = "ph"
-    TURBIDITY = "turbidity"
+    TURBIDITY_INDEX = "turbidity_index"
     TEMPERATURE = "temperature"
     TDS = "tds"
-    DISSOLVED_OXYGEN = "dissolved_oxygen"
 
 
 class CalibrationRequest(BaseModel):

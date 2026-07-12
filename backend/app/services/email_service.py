@@ -306,7 +306,7 @@ class EmailService:
                     
                     <div class="feature">
                         <strong>📊 Real-time Monitoring</strong><br>
-                        Track pH, Turbidity, TDS, and Temperature 24/7
+                        Track pH, Turbidity Index, TDS, and Temperature 24/7
                     </div>
                     
                     <div class="feature">

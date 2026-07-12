@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     app_version: str = "1.0.0"
     debug: bool = False
     api_v1_prefix: str = "/api/v1"
+    port: int = 8080  # Server port
     
     # Database
     mongodb_url: str = "mongodb://localhost:27017"

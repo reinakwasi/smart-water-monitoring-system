@@ -16,7 +16,7 @@ import { LineChart } from 'react-native-chart-kit';
 import { useTheme } from '../context/ThemeContext';
 import { TOKEN_KEY } from '../services/api';
 
-const API_BASE_URL = 'http://10.0.2.2:8000/api/v1';
+const API_BASE_URL = 'http://172.20.10.5:8080/api/v1';
 const screenWidth = Dimensions.get('window').width;
 
 const HistoryScreen = ({ navigation }) => {
@@ -75,7 +75,7 @@ const HistoryScreen = ({ navigation }) => {
       history.push({
         timestamp: date,
         ph: Math.max(6.5, Math.min(8.5, (currentData.water_quality.parameters.ph || 7.2) + variance())),
-        turbidity: Math.max(0, Math.min(50, (currentData.water_quality.parameters.turbidity || 3.1) + variance() * 10)),
+        turbidity: Math.max(0, Math.min(50, (currentData.water_quality.parameters.turbidity_index ?? 3.1) + variance() * 10)),
         tds: Math.max(0, Math.min(500, (currentData.water_quality.parameters.tds || 312) + variance() * 50)),
         temperature: Math.max(20, Math.min(30, (currentData.water_quality.parameters.temperature || 24) + variance() * 3)),
         classification: i === 0 ? 'Not safe' : i === 2 ? 'Caution' : 'Safe',
@@ -124,7 +124,7 @@ const HistoryScreen = ({ navigation }) => {
     
     switch (parameter) {
       case 'ph': return `${value.toFixed(1)} today`;
-      case 'turbidity': return `${value.toFixed(1)} NTU today`;
+      case 'turbidity': return `${value.toFixed(1)} /100 today`;
       case 'tds': return `${Math.round(value)} ppm today`;
       case 'temperature': return `${Math.round(value)}°C today`;
       default: return `${value}`;

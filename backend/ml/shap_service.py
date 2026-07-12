@@ -36,7 +36,7 @@ class SHAPService:
         self.classifier_explainer = None
         self.risk_predictor_explainer = None
         
-        # Feature names for classification (5 sensor parameters)
+        # Feature names for classification (5 model features; dissolved oxygen uses a temporary default)
         self.classification_features = [
             'ph',
             'turbidity',

@@ -29,13 +29,12 @@ class DataPreparator:
         """
         self.random_state = random_state
         
-        # Feature columns for classification (5 sensor parameters)
+        # Feature columns for classification (4 sensor parameters)
         self.classification_features = [
             'ph',
             'turbidity',
             'temperature',
-            'tds',
-            'dissolved_oxygen'
+            'tds'
         ]
         
         # Target column for classification

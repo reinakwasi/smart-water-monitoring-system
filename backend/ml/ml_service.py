@@ -43,7 +43,7 @@ class MLService:
         self.classifier_version = classifier_version
         self.risk_predictor_version = risk_predictor_version
         
-        # Feature names for classification (5 sensor parameters)
+        # Feature names for classification (5 model features; dissolved oxygen uses a temporary default)
         self.classification_features = [
             'ph',
             'turbidity',
@@ -127,7 +127,6 @@ class MLService:
                 - turbidity: Turbidity in NTU
                 - temperature: Temperature in Celsius
                 - tds: Total Dissolved Solids in ppm
-                - dissolved_oxygen: Dissolved oxygen in mg/L
                 
         Returns:
             Dictionary containing:

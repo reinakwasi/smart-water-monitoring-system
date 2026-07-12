@@ -15,7 +15,7 @@ import { useTheme } from '../context/ThemeContext';
 import { TOKEN_KEY } from '../services/api';
 import { loadUserProfile, getFirstName } from '../utils/profileLoader';
 
-const API_BASE_URL = 'http://10.0.2.2:8000/api/v1';
+const API_BASE_URL = 'http://172.20.10.5:8080/api/v1';
 
 const HomeScreen = ({ navigation }) => {
   const { theme } = useTheme();
@@ -106,7 +106,7 @@ const HomeScreen = ({ navigation }) => {
         confidence: Math.round(data.water_quality.confidence * 100),
         parameters: {
           ph: data.water_quality.parameters.ph || 0,
-          turbidity: data.water_quality.parameters.turbidity || 0,
+          turbidity: data.water_quality.parameters.turbidity_index ?? 0,
           temperature: data.water_quality.parameters.temperature || 0,
           tds: data.water_quality.parameters.tds || 0,
         },
@@ -175,7 +175,7 @@ const HomeScreen = ({ navigation }) => {
         if (value >= 6.5 && value <= 8.5) return { text: 'Safe range', color: 'text-green-500' };
         return { text: 'Out of range', color: 'text-red-500' };
       case 'turbidity':
-        if (value < 5) return { text: 'Clear', color: 'text-green-500' };
+        if (value <= 10) return { text: 'Clear', color: 'text-green-500' };
         return { text: 'Cloudy', color: 'text-orange-500' };
       case 'tds':
         if (value < 500) return { text: 'Normal', color: 'text-green-500' };
@@ -292,7 +292,7 @@ const HomeScreen = ({ navigation }) => {
             <View className="absolute top-4 right-4 w-2 h-2 rounded-full bg-green-500" />
             <Text className="text-xs mb-1" style={{ color: theme.colors.textSecondary }}>Turbidity</Text>
             <Text className="text-3xl font-bold mb-0.5" style={{ color: theme.colors.text }}>
-              {waterQuality.parameters.turbidity !== null ? waterQuality.parameters.turbidity.toFixed(1) : '--'}<Text className="text-base font-normal" style={{ color: theme.colors.textTertiary }}>NTU</Text>
+              {waterQuality.parameters.turbidity !== null ? waterQuality.parameters.turbidity.toFixed(1) : '--'}<Text className="text-base font-normal" style={{ color: theme.colors.textTertiary }}>/100</Text>
             </Text>
             <Text className={`text-xs font-medium ${waterQuality.parameters.turbidity !== null ? getParameterStatus('turbidity', waterQuality.parameters.turbidity).color : 'text-gray-400'}`}>
               {waterQuality.parameters.turbidity !== null ? getParameterStatus('turbidity', waterQuality.parameters.turbidity).text : 'Loading...'}

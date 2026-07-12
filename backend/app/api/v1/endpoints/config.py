@@ -65,9 +65,9 @@ async def get_config(
                     "unsafe_min": 5.0,
                     "unsafe_max": 10.0
                 },
-                "turbidity": {
-                    "safe_max": 5.0,
-                    "unsafe_max": 25.0
+                "turbidity_index": {
+                    "safe_max": 10.0,
+                    "unsafe_max": 50.0
                 },
                 "temperature": {
                     "safe_min": 15.0,
@@ -78,10 +78,6 @@ async def get_config(
                 "tds": {
                     "safe_max": 300.0,
                     "unsafe_max": 600.0
-                },
-                "dissolved_oxygen": {
-                    "safe_min": 6.0,
-                    "unsafe_min": 4.0
                 }
             },
             "risk_thresholds": {
@@ -160,9 +156,9 @@ async def update_config(
                     "unsafe_min": 5.0,
                     "unsafe_max": 10.0
                 },
-                "turbidity": {
-                    "safe_max": 5.0,
-                    "unsafe_max": 25.0
+                "turbidity_index": {
+                    "safe_max": 10.0,
+                    "unsafe_max": 50.0
                 },
                 "temperature": {
                     "safe_min": 15.0,
@@ -173,10 +169,6 @@ async def update_config(
                 "tds": {
                     "safe_max": 300.0,
                     "unsafe_max": 600.0
-                },
-                "dissolved_oxygen": {
-                    "safe_min": 6.0,
-                    "unsafe_min": 4.0
                 }
             },
             "risk_thresholds": {
@@ -293,10 +285,9 @@ async def calibrate_sensor(
     # Validate offset is reasonable (not too large)
     max_offsets = {
         "ph": 2.0,
-        "turbidity": 100.0,
+        "turbidity_index": 100.0,
         "temperature": 10.0,
-        "tds": 200.0,
-        "dissolved_oxygen": 5.0
+        "tds": 200.0
     }
     
     max_offset = max_offsets.get(calibration.sensor_type.value, 100.0)
@@ -316,10 +307,9 @@ async def calibrate_sensor(
             "device_name": f"Sensor {calibration.device_id}",
             "calibration": {
                 "ph_offset": 0.0,
-                "turbidity_offset": 0.0,
+                "turbidity_index_offset": 0.0,
                 "temperature_offset": 0.0,
-                "tds_offset": 0.0,
-                "dissolved_oxygen_offset": 0.0
+                "tds_offset": 0.0
             },
             "is_online": True,
             "last_communication": datetime.utcnow(),

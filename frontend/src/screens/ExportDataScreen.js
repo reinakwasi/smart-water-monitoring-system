@@ -18,7 +18,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
 
-const API_BASE_URL = 'http://10.0.2.2:8000/api/v1';
+const API_BASE_URL = 'http://172.20.10.5:8080/api/v1';
 
 const ExportDataScreen = ({ navigation }) => {
   const { theme } = useTheme();
@@ -134,12 +134,12 @@ const ExportDataScreen = ({ navigation }) => {
   };
 
   const generateCSV = (data) => {
-    let csv = 'Timestamp,pH,Turbidity (NTU),TDS (ppm),Temperature (°C),Classification,Risk Score,Tank Level (%)\n';
+    let csv = 'Timestamp,pH,Turbidity Index (/100),TDS (ppm),Temperature (°C),Classification,Risk Score,Tank Level (%)\n';
     
     data.data.forEach(point => {
       const timestamp = new Date(point.timestamp).toLocaleString();
       const ph = point.parameters.ph || 'N/A';
-      const turbidity = point.parameters.turbidity || 'N/A';
+      const turbidity = point.parameters.turbidity_index ?? 'N/A';
       const tds = point.parameters.tds || 'N/A';
       const temperature = point.parameters.temperature || 'N/A';
       const classification = point.classification || 'N/A';
@@ -158,7 +158,7 @@ const ExportDataScreen = ({ navigation }) => {
     const generatedTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     
     const avgPh = (data.data.reduce((sum, p) => sum + (p.parameters.ph || 0), 0) / data.data.length).toFixed(2);
-    const avgTurbidity = (data.data.reduce((sum, p) => sum + (p.parameters.turbidity || 0), 0) / data.data.length).toFixed(2);
+    const avgTurbidity = (data.data.reduce((sum, p) => sum + (p.parameters.turbidity_index ?? 0), 0) / data.data.length).toFixed(2);
     const avgTds = Math.round(data.data.reduce((sum, p) => sum + (p.parameters.tds || 0), 0) / data.data.length);
     const avgTemp = (data.data.reduce((sum, p) => sum + (p.parameters.temperature || 0), 0) / data.data.length).toFixed(1);
     
@@ -184,7 +184,7 @@ const ExportDataScreen = ({ navigation }) => {
           <td style="padding: 14px 12px; text-align: center; font-weight: 600; color: #64748b;">${index + 1}</td>
           <td style="padding: 14px 12px; color: #1e293b; font-size: 13px;">${timestamp}</td>
           <td style="padding: 14px 12px; text-align: center; font-weight: 600; color: #0891b2;">${point.parameters.ph?.toFixed(2) || 'N/A'}</td>
-          <td style="padding: 14px 12px; text-align: center; font-weight: 600; color: #0891b2;">${point.parameters.turbidity?.toFixed(2) || 'N/A'}</td>
+          <td style="padding: 14px 12px; text-align: center; font-weight: 600; color: #0891b2;">${point.parameters.turbidity_index?.toFixed(2) || 'N/A'}</td>
           <td style="padding: 14px 12px; text-align: center; font-weight: 600; color: #0891b2;">${point.parameters.tds?.toFixed(0) || 'N/A'}</td>
           <td style="padding: 14px 12px; text-align: center; font-weight: 600; color: #0891b2;">${point.parameters.temperature?.toFixed(1) || 'N/A'}</td>
           <td style="padding: 14px 12px; text-align: center;">
@@ -469,7 +469,7 @@ const ExportDataScreen = ({ navigation }) => {
               <div class="summary-card">
                 <h3>Average Turbidity</h3>
                 <div class="value">${avgTurbidity}</div>
-                <div class="unit">NTU</div>
+                <div class="unit">/100</div>
               </div>
               <div class="summary-card">
                 <h3>Average TDS</h3>
@@ -496,7 +496,7 @@ const ExportDataScreen = ({ navigation }) => {
                     <th style="text-align: center;">#</th>
                     <th>Timestamp</th>
                     <th style="text-align: center;">pH</th>
-                    <th style="text-align: center;">Turbidity<br/>(NTU)</th>
+                    <th style="text-align: center;">Turbidity Index<br/>(/100)</th>
                     <th style="text-align: center;">TDS<br/>(ppm)</th>
                     <th style="text-align: center;">Temp<br/>(°C)</th>
                     <th style="text-align: center;">Status</th>

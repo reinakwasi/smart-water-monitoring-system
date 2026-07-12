@@ -90,7 +90,7 @@ def sample_sensor_data():
         "device_id": "ESP32_TEST_001",
         "timestamp": "2025-01-15T10:30:00Z",
         "ph": 7.2,
-        "turbidity": 15.5,
+        "turbidity_index": 15.5,
         "temperature": 25.3,
         "tds": 150,
         "dissolved_oxygen": 8.5

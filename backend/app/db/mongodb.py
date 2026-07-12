@@ -27,7 +27,7 @@ class MongoDB:
         - connectTimeoutMS: Timeout for initial connection
         """
         try:
-            logger.info(f"Connecting to MongoDB at {settings.mongodb_url}")
+            logger.info("Connecting to configured MongoDB instance")
             
             self.client = AsyncIOMotorClient(
                 settings.mongodb_url,

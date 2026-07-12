@@ -15,10 +15,9 @@ class SensorReadingDocument(BaseModel):
     
     # Sensor parameters
     ph: float
-    turbidity: float
+    turbidity_index: float  # 0-100 relative scale, self-calibrated
     temperature: float
     tds: float
-    dissolved_oxygen: float
     
     # ML predictions
     classification: str  # Safe, Warning, Unsafe
@@ -39,10 +38,9 @@ class SensorReadingDocument(BaseModel):
                 "device_id": "ESP32_001",
                 "timestamp": "2025-01-15T10:30:00Z",
                 "ph": 7.2,
-                "turbidity": 15.5,
+                "turbidity_index": 15.5,
                 "temperature": 25.3,
                 "tds": 150.0,
-                "dissolved_oxygen": 8.5,
                 "classification": "Safe",
                 "classification_confidence": 0.92,
                 "risk_score": 0.35,
@@ -51,15 +49,13 @@ class SensorReadingDocument(BaseModel):
                     "ph": 0.12,
                     "turbidity": 0.45,
                     "temperature": -0.08,
-                    "tds": 0.23,
-                    "dissolved_oxygen": -0.15
+                    "tds": 0.23
                 },
                 "risk_shap_values": {
                     "ph": 0.05,
                     "turbidity": 0.18,
                     "temperature": -0.03,
-                    "tds": 0.10,
-                    "dissolved_oxygen": -0.08
+                    "tds": 0.10
                 },
                 "created_at": "2025-01-15T10:30:01Z"
             }
@@ -163,8 +159,7 @@ class SensorDeviceDocument(BaseModel):
             "ph_offset": 0.0,
             "turbidity_offset": 0.0,
             "temperature_offset": 0.0,
-            "tds_offset": 0.0,
-            "dissolved_oxygen_offset": 0.0
+            "tds_offset": 0.0
         }
     )
     
@@ -185,8 +180,7 @@ class SensorDeviceDocument(BaseModel):
                     "ph_offset": 0.0,
                     "turbidity_offset": 0.0,
                     "temperature_offset": 0.0,
-                    "tds_offset": 0.0,
-                    "dissolved_oxygen_offset": 0.0
+                    "tds_offset": 0.0
                 },
                 "is_online": True,
                 "last_communication": "2025-01-15T10:30:00Z",
@@ -229,10 +223,6 @@ class SystemConfigDocument(BaseModel):
             "tds": {
                 "safe_max": 300.0,
                 "unsafe_max": 600.0
-            },
-            "dissolved_oxygen": {
-                "safe_min": 6.0,
-                "unsafe_min": 4.0
             }
         }
     )

@@ -167,9 +167,10 @@ async def ingest_sensor_data(
             )
         
         # Prepare sensor data dictionary for ML inference
+        # Note: Scale turbidity_index (0-100) to match training data range (0-50)
         sensor_dict = {
             "ph": sensor_data.ph,
-            "turbidity": sensor_data.turbidity,
+            "turbidity": sensor_data.turbidity_index * 0.5,  # Scale down to match training range
             "temperature": sensor_data.temperature,
             "tds": sensor_data.tds,
             "dissolved_oxygen": sensor_data.dissolved_oxygen
@@ -224,11 +225,11 @@ async def ingest_sensor_data(
         historical_readings = []
         async for reading in historical_cursor:
             historical_readings.append({
-                "ph": reading["ph"],
-                "turbidity": reading["turbidity"],
-                "temperature": reading["temperature"],
-                "tds": reading["tds"],
-                "dissolved_oxygen": reading["dissolved_oxygen"]
+                "ph": reading.get("ph", 7.0),
+                "turbidity": reading.get("turbidity_index", reading.get("turbidity", 5.0)) * 0.5,  # Scale for ML, fallback to 'turbidity' field or default
+                "temperature": reading.get("temperature", 25.0),
+                "tds": reading.get("tds", 100.0),
+                "dissolved_oxygen": reading.get("dissolved_oxygen", 8.5)
             })
         
         # Reverse to get chronological order (oldest to newest)
@@ -288,7 +289,7 @@ async def ingest_sensor_data(
             "device_id": sensor_data.device_id,
             "timestamp": sensor_data.timestamp,
             "ph": sensor_data.ph,
-            "turbidity": sensor_data.turbidity,
+            "turbidity_index": sensor_data.turbidity_index,
             "temperature": sensor_data.temperature,
             "tds": sensor_data.tds,
             "dissolved_oxygen": sensor_data.dissolved_oxygen,

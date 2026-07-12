@@ -15,7 +15,7 @@ import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
 import { TOKEN_KEY } from '../services/api';
 
-const API_BASE_URL = 'http://10.0.2.2:8000/api/v1';
+const API_BASE_URL = 'http://172.20.10.5:8080/api/v1';
 
 const AlertsScreen = ({ navigation }) => {
   const { theme } = useTheme();
@@ -149,7 +149,7 @@ const AlertsScreen = ({ navigation }) => {
   };
 
   const getMainIssue = (params) => {
-    if (params.turbidity > 5) return 'Turbidity levels are very high';
+    if (params.turbidity_index > 50) return 'Turbidity levels are very high';
     if (params.ph < 6.5 || params.ph > 8.5) return 'pH levels are out of range';
     if (params.tds > 500) return 'TDS levels are too high';
     return 'Water quality is poor';

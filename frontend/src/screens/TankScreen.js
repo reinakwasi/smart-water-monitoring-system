@@ -13,7 +13,7 @@ import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
 import { TOKEN_KEY } from '../services/api';
 
-const API_BASE_URL = 'http://10.0.2.2:8000/api/v1';
+const API_BASE_URL = 'http://172.20.10.5:8080/api/v1';
 
 const TankScreen = ({ navigation }) => {
   const { theme } = useTheme();

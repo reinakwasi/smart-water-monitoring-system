@@ -1,7 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE_URL = 'http://10.0.2.2:8000';
+const BASE_URL = 'http://172.20.10.5:8080';
 
 // Export AsyncStorage key constants for consistent usage across the app
 export const TOKEN_KEY = '@water_quality_token';
