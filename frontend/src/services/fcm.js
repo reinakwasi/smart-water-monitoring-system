@@ -32,29 +32,29 @@ export const getFCMToken = async () => {
 
 export const setupFCMListeners = () => {
   const messagingInstance = messaging();
-  
+
   const unsubscribeOnMessage = messagingInstance.onMessage(async remoteMessage => {
-    
+
   });
 
   messagingInstance.setBackgroundMessageHandler(async remoteMessage => {
-    
+
   });
 
   const unsubscribeOnNotificationOpenedApp = messagingInstance.onNotificationOpenedApp(remoteMessage => {
-    
+
   });
 
   messagingInstance
     .getInitialNotification()
     .then(remoteMessage => {
       if (remoteMessage) {
-        
+
       }
     });
 
   const unsubscribeOnTokenRefresh = messagingInstance.onTokenRefresh(token => {
-    
+
   });
 
   return () => {
@@ -64,10 +64,6 @@ export const setupFCMListeners = () => {
   };
 };
 
-export const registerTokenWithBackend = async (token, userId) => {
-  try {
-    return true;
-  } catch (error) {
-    return false;
-  }
-};
+// Remote push registration is intentionally disabled until a matching backend
+// endpoint is deployed. In-app alerts remain fully functional.
+export const registerTokenWithBackend = async () => false;

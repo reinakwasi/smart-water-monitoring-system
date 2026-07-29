@@ -15,7 +15,7 @@ export const loadUserProfile = async () => {
     if (!userName || !userEmail) {
       try {
         const profile = await authAPI.getProfile();
-        
+
         if (profile.full_name) {
           userName = profile.full_name;
           await AsyncStorage.setItem(USER_NAME_KEY, userName);

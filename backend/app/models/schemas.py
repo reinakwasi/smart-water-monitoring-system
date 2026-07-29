@@ -46,58 +46,55 @@ class UserRole(str, Enum):
 class SensorDataRequest(BaseModel):
     """
     Request model for sensor data from ESP32
-    
+
     Validates sensor readings are within physical measurement ranges:
     - pH: 0-14
-    - Turbidity Index: 0-100 (self-calibrated relative scale, NOT certified NTU)
+    - Turbidity: 0-3000 NTU from the calibrated sensor
     - Temperature: -55 to 125°C
-    - TDS: 0-1000 ppm
-    
-    Requirements: 1.1-1.4, 1.9, 15.1, 15.7
+    - TDS: 0-2000 ppm
     """
     device_id: str = Field(..., min_length=1, max_length=100, description="Unique device identifier")
     timestamp: datetime = Field(default_factory=datetime.utcnow, description="Reading timestamp; server time is used when the device omits it")
     ph: float = Field(..., ge=0.0, le=14.0, description="pH level (0-14)")
-    turbidity_index: float = Field(..., ge=0.0, le=100.0, description="Turbidity index (0-100, self-calibrated relative scale, NOT certified NTU)")
+    turbidity_index: float = Field(..., ge=0.0, le=3000.0, description="Turbidity in NTU from calibrated sensor voltage")
     temperature: float = Field(..., ge=-55.0, le=125.0, description="Temperature in Celsius (-55 to 125)")
-    tds: float = Field(..., ge=0.0, le=1000.0, description="Total Dissolved Solids in ppm (0-1000)")
-    dissolved_oxygen: float = Field(default=8.5, ge=0.0, le=20.0, description="Temporary model-compatibility value until a dissolved oxygen sensor is added")
-    
+    tds: float = Field(..., ge=0.0, le=2000.0, description="Total Dissolved Solids in ppm (0-2000)")
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "device_id": "ESP32_001",
                 "timestamp": "2025-01-15T10:30:00Z",
                 "ph": 7.2,
-                "turbidity_index": 15.5,
+                "turbidity_index": 1.5,
                 "temperature": 25.3,
                 "tds": 150.0
             }
         }
     )
-    
+
     @field_validator('ph')
     @classmethod
     def validate_ph_precision(cls, v: float) -> float:
-        """Validate pH precision to ±0.1 units (Requirement 1.1)"""
+        """Validate pH precision to ±0.1 units"""
         return round(v, 1)
-    
+
     @field_validator('turbidity_index')
     @classmethod
     def validate_turbidity_index_precision(cls, v: float) -> float:
-        """Validate turbidity index precision to 0.1 units (self-calibrated relative scale)"""
+        """Validate turbidity precision to 0.1 NTU."""
         return round(v, 1)
-    
+
     @field_validator('temperature')
     @classmethod
     def validate_temperature_precision(cls, v: float) -> float:
-        """Validate temperature precision to ±0.5°C (Requirement 1.3)"""
+        """Validate temperature precision to ±0.5°C"""
         return round(v, 1)
-    
+
     @field_validator('tds')
     @classmethod
     def validate_tds_precision(cls, v: float) -> float:
-        """Validate TDS precision to ±10 ppm (Requirement 1.4)"""
+        """Validate TDS precision to ±10 ppm"""
         return round(v, 0)
 
 
@@ -108,7 +105,7 @@ class TankLevelRequest(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.utcnow, description="Reading timestamp; server time is used when the device omits it")
     distance_cm: float = Field(..., ge=0.0, le=500.0, description="Distance from sensor to water surface in cm")
     tank_height_cm: float = Field(..., ge=0.0, le=500.0, description="Total tank height in cm")
-    
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -119,11 +116,11 @@ class TankLevelRequest(BaseModel):
             }
         }
     )
-    
+
     @field_validator('distance_cm')
     @classmethod
     def validate_distance_precision(cls, v: float) -> float:
-        """Validate distance precision to ±2 cm (Requirement 2.1)"""
+        """Validate distance precision to ±2 cm"""
         return round(v, 1)
 
 
@@ -136,7 +133,7 @@ class SHAPFactor(BaseModel):
     feature: str = Field(..., description="Feature name")
     shap_value: float = Field(..., description="SHAP contribution value")
     direction: str = Field(..., description="Direction of influence: 'increasing_risk' or 'decreasing_risk'")
-    
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -153,7 +150,7 @@ class SHAPExplanation(BaseModel):
     SHAP explanation for model predictions    """
     shap_values: Dict[str, float] = Field(..., description="SHAP values for all features")
     top_factors: List[SHAPFactor] = Field(..., description="Top contributing factors ranked by absolute SHAP value")
-    
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -181,6 +178,31 @@ class SHAPExplanation(BaseModel):
 
 
 # ============================================================================
+# Response Models - Parameter Classifications
+# ============================================================================
+
+class ParameterClassifications(BaseModel):
+    """
+    Parameter-level quality band classifications used by AquaGuard
+    """
+    ph: str = Field(..., description="pH quality band (e.g., Excellent, Good, Acidic/Unsafe)")
+    turbidity_index: str = Field(..., description="Turbidity quality band (e.g., Excellent, Good, Poor)")
+    temperature: str = Field(..., description="Temperature monitoring band (e.g., Cold, Normal, Warm)")
+    tds: str = Field(..., description="TDS taste band (e.g., Excellent, Good, Fair, Poor, Unacceptable)")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "ph": "Excellent",
+                "turbidity_index": "Good",
+                "temperature": "Excellent",
+                "tds": "Good"
+            }
+        }
+    )
+
+
+# ============================================================================
 # Response Models - Classification and Risk Prediction
 # ============================================================================
 
@@ -191,7 +213,7 @@ class ClassificationResult(BaseModel):
     confidence: float = Field(..., ge=0.0, le=1.0, description="Classification confidence score")
     shap_explanation: SHAPExplanation = Field(..., description="SHAP explanation for classification")
     timestamp: datetime = Field(..., description="Prediction timestamp")
-    
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -202,8 +224,7 @@ class ClassificationResult(BaseModel):
                         "ph": 0.12,
                         "turbidity": 0.45,
                         "temperature": -0.08,
-                        "tds": 0.23,
-                        "dissolved_oxygen": -0.15
+                        "tds": 0.23
                     },
                     "top_factors": [
                         {
@@ -226,7 +247,7 @@ class RiskPredictionResult(BaseModel):
     risk_level: RiskLevel = Field(..., description="Risk level classification")
     shap_explanation: SHAPExplanation = Field(..., description="SHAP explanation for risk prediction")
     timestamp: datetime = Field(..., description="Prediction timestamp")
-    
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -237,8 +258,7 @@ class RiskPredictionResult(BaseModel):
                         "ph": 0.05,
                         "turbidity": 0.18,
                         "temperature": -0.03,
-                        "tds": 0.10,
-                        "dissolved_oxygen": -0.08
+                        "tds": 0.10
                     },
                     "top_factors": [
                         {
@@ -256,13 +276,15 @@ class RiskPredictionResult(BaseModel):
 
 class SensorDataResponse(BaseModel):
     """
-    Complete response for sensor data ingestion    """
+    Complete response for sensor data ingestion
+    """
     status: str = Field(..., description="Response status")
     reading_id: str = Field(..., description="MongoDB ObjectId of stored reading")
     classification: ClassificationResult = Field(..., description="Water quality classification")
     risk_prediction: RiskPredictionResult = Field(..., description="Contamination risk prediction")
+    parameter_classifications: ParameterClassifications = Field(..., description="Operational parameter classifications")
     timestamp: datetime = Field(..., description="Response timestamp")
-    
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -286,6 +308,12 @@ class SensorDataResponse(BaseModel):
                     },
                     "timestamp": "2025-01-15T10:30:01Z"
                 },
+                "parameter_classifications": {
+                    "ph": "Excellent",
+                    "turbidity_index": "Good",
+                    "temperature": "Excellent",
+                    "tds": "Good"
+                },
                 "timestamp": "2025-01-15T10:30:01Z"
             }
         }
@@ -301,7 +329,7 @@ class TankLevelResponse(BaseModel):
     level_percent: float = Field(..., ge=0.0, le=100.0, description="Tank level percentage")
     volume_liters: float = Field(..., ge=0.0, description="Estimated water volume in liters")
     timestamp: datetime = Field(..., description="Response timestamp")
-    
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -321,12 +349,52 @@ class TankLevelResponse(BaseModel):
 # ============================================================================
 
 class WaterQualityStatus(BaseModel):
-    """Current water quality status"""
+    """
+    Current water quality status
+    """
     classification: WaterQualityClassification = Field(..., description="Current classification")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Classification confidence")
     parameters: Dict[str, float] = Field(..., description="Current sensor parameter values")
+    parameter_classifications: ParameterClassifications = Field(..., description="Operational parameter classifications")
     shap_explanation: SHAPExplanation = Field(..., description="SHAP explanation")
     timestamp: datetime = Field(..., description="Reading timestamp")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "classification": "Safe",
+                "confidence": 0.92,
+                "parameters": {
+                    "ph": 7.2,
+                    "turbidity_index": 1.5,
+                    "temperature": 22.3,
+                    "tds": 274.0
+                },
+                "parameter_classifications": {
+                    "ph": "Excellent",
+                    "turbidity_index": "Good",
+                    "temperature": "Excellent",
+                    "tds": "Good"
+                },
+                "shap_explanation": {
+                    "shap_values": {
+                        "ph": 0.12,
+                        "turbidity_index": 0.45,
+                        "temperature": -0.08,
+                        "tds": 0.23
+                    },
+                    "top_factors": [
+                        {
+                            "feature": "turbidity_index",
+                            "shap_value": 0.45,
+                            "direction": "increasing_risk"
+                        }
+                    ]
+                },
+                "timestamp": "2025-01-15T10:30:00Z"
+            }
+        }
+    )
 
 
 class ContaminationRiskStatus(BaseModel):
@@ -385,7 +453,7 @@ class UserRegisterRequest(BaseModel):
     password: str = Field(..., min_length=8, max_length=100, description="User password (min 8 characters)")
     full_name: str = Field(..., min_length=1, max_length=255, description="User full name")
     role: UserRole = Field(default=UserRole.USER, description="User role")
-    
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -402,7 +470,7 @@ class UserLoginRequest(BaseModel):
     """User login request"""
     email: str = Field(..., description="User email address")
     password: str = Field(..., description="User password")
-    
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -411,6 +479,7 @@ class UserLoginRequest(BaseModel):
             }
         }
     )
+
 
 
 class UserResponse(BaseModel):
@@ -425,10 +494,16 @@ class UserResponse(BaseModel):
     created_at: datetime = Field(..., description="Account creation timestamp")
 
 
+class RefreshTokenRequest(BaseModel):
+    """Request a new access token without resending the user's password."""
+    refresh_token: str = Field(..., min_length=20, description="Long-lived refresh token")
+
+
 class TokenResponse(BaseModel):
     """JWT token response"""
     access_token: str = Field(..., description="JWT access token")
     token_type: str = Field(default="bearer", description="Token type")
+    refresh_token: Optional[str] = Field(None, description="Long-lived refresh token")
     expires_in: int = Field(..., description="Token expiration time in seconds")
     user: UserResponse = Field(..., description="User information")
 
@@ -440,6 +515,25 @@ class UpdateProfileRequest(BaseModel):
     location: Optional[str] = Field(None, max_length=200, description="User location")
     profile_picture: Optional[str] = Field(None, description="User profile picture (base64)")
 
+
+
+class ChangePasswordRequest(BaseModel):
+    """Authenticated password change request."""
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+
+class NotificationPreferencesRequest(BaseModel):
+    """Alert categories controlled by the account owner."""
+    unsafe_water_alerts: bool = True
+    contamination_risk: bool = True
+    tank_level_alerts: bool = True
+    push_enabled: bool = True
+
+
+class FCMTokenRequest(BaseModel):
+    """Register or clear the current mobile installation's FCM token."""
+    token: Optional[str] = Field(None, max_length=4096)
 
 # ============================================================================
 # Configuration Models
@@ -464,7 +558,7 @@ class RiskThresholds(BaseModel):
     """Risk level threshold values"""
     low_max: float = Field(..., ge=0.0, le=1.0, description="Maximum risk score for Low level")
     medium_max: float = Field(..., ge=0.0, le=1.0, description="Maximum risk score for Medium level")
-    
+
     @field_validator('medium_max')
     @classmethod
     def validate_medium_greater_than_low(cls, v: float, info) -> float:
@@ -481,7 +575,7 @@ class SystemConfigResponse(BaseModel):
     quality_thresholds: Dict[str, QualityThreshold] = Field(..., description="Water quality thresholds per parameter")
     risk_thresholds: RiskThresholds = Field(..., description="Contamination risk thresholds")
     tank_dimensions: TankDimensions = Field(..., description="Tank physical dimensions")
-    
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -529,7 +623,7 @@ class SystemConfigUpdateRequest(BaseModel):
     quality_thresholds: Optional[Dict[str, QualityThreshold]] = Field(None, description="Water quality thresholds per parameter")
     risk_thresholds: Optional[RiskThresholds] = Field(None, description="Contamination risk thresholds")
     tank_dimensions: Optional[TankDimensions] = Field(None, description="Tank physical dimensions")
-    
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -561,7 +655,7 @@ class ConfigUpdateResponse(BaseModel):
     status: str = Field(default="success", description="Response status")
     message: str = Field(..., description="Success message")
     updated_at: datetime = Field(..., description="Update timestamp")
-    
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -592,7 +686,7 @@ class CalibrationRequest(BaseModel):
     sensor_type: SensorType = Field(..., description="Type of sensor to calibrate")
     reference_value: float = Field(..., description="Known reference value")
     current_reading: float = Field(..., description="Current sensor reading")
-    
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -612,7 +706,7 @@ class CalibrationResponse(BaseModel):
     applied_at: datetime = Field(..., description="Calibration application timestamp")
     device_id: str = Field(..., description="Device identifier")
     sensor_type: str = Field(..., description="Sensor type")
-    
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -636,7 +730,7 @@ class ErrorResponse(BaseModel):
     message: str = Field(..., description="Error message")
     detail: Optional[str] = Field(None, description="Detailed error information")
     timestamp: datetime = Field(default_factory=datetime.utcnow, description="Error timestamp")
-    
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -667,7 +761,7 @@ class ComponentHealth(BaseModel):
     latency_ms: Optional[float] = Field(None, description="Component latency in milliseconds (for database)")
     classifier_version: Optional[str] = Field(None, description="Classifier model version (for ML models)")
     predictor_version: Optional[str] = Field(None, description="Risk predictor model version (for ML models)")
-    
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -684,7 +778,7 @@ class SensorDeviceHealth(BaseModel):
     device_id: str = Field(..., description="Sensor device ID")
     status: str = Field(..., description="Device status (online, offline)")
     last_communication: Optional[datetime] = Field(None, description="Timestamp of last communication")
-    
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -703,7 +797,7 @@ class HealthCheckResponse(BaseModel):
     timestamp: datetime = Field(..., description="Health check timestamp")
     components: Dict[str, ComponentHealth] = Field(..., description="Health status of system components")
     sensors: List[SensorDeviceHealth] = Field(default_factory=list, description="Health status of sensor devices")
-    
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -730,6 +824,156 @@ class HealthCheckResponse(BaseModel):
                         "last_communication": "2025-01-15T10:30:00Z"
                     }
                 ]
+            }
+        }
+    )
+
+
+# ============================================================================
+# Device Management Models
+# ============================================================================
+
+class DeviceRegistrationRequest(BaseModel):
+    """
+    Request model for device registration
+
+    Regular users can only register devices to their own account.
+    Admins can register devices to any user account by specifying target_user_id.
+    """
+    device_id: str = Field(..., min_length=1, max_length=100, description="Unique ESP32 device identifier")
+    device_name: str = Field(..., min_length=1, max_length=255, description="Human-readable device name")
+    location: Optional[str] = Field(None, max_length=255, description="Physical location of the device")
+    target_user_id: Optional[str] = Field(None, description="Target user ID for device registration (admin only)")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "device_id": "ESP32_001",
+                "device_name": "Kitchen Water Monitor",
+                "location": "Main Building - Kitchen",
+                "target_user_id": None
+            }
+        }
+    )
+
+
+class DeviceRegistrationResponse(BaseModel):
+    """
+    Response model for device registration
+
+    Contains the generated API key which is only shown once.
+    Users must save this key securely to configure their ESP32 device.
+    """
+    status: str = Field(default="success", description="Response status")
+    device_id: str = Field(..., description="Registered device ID")
+    device_name: str = Field(..., description="Device name")
+    api_key: str = Field(..., description="Generated API key (only shown once - save securely)")
+    user_id: str = Field(..., description="User ID who owns the device")
+    registered_at: datetime = Field(..., description="Registration timestamp")
+    message: str = Field(default="Device registered successfully. Save this API key securely.", description="Success message")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "status": "success",
+                "device_id": "ESP32_001",
+                "device_name": "Kitchen Water Monitor",
+                "api_key": "8j2k4h6g9f1d3s5a7z9x0c2v4b6n8m1q3w5e7r9t0y2u4i6o8p1a3s5d",
+                "user_id": "65a1b2c3d4e5f6g7h8i9j0k1",
+                "registered_at": "2025-01-15T10:30:00Z",
+                "message": "Device registered successfully. Save this API key securely."
+            }
+        }
+    )
+
+
+class DeviceInfo(BaseModel):
+    """
+    Device information model for device listing
+    """
+    device_id: str = Field(..., description="Device ID")
+    device_name: str = Field(..., description="Device name")
+    location: Optional[str] = Field(None, description="Device location")
+    registered_at: datetime = Field(..., description="Registration timestamp")
+    last_communication: Optional[datetime] = Field(None, description="Last communication timestamp from device")
+    is_active: bool = Field(..., description="Whether the device is active")
+    api_key_expires_at: Optional[datetime] = Field(None, description="API key expiration timestamp")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "device_id": "ESP32_001",
+                "device_name": "Kitchen Water Monitor",
+                "location": "Main Building - Kitchen",
+                "registered_at": "2025-01-15T10:30:00Z",
+                "last_communication": "2025-01-15T12:45:00Z",
+                "is_active": True,
+                "api_key_expires_at": None
+            }
+        }
+    )
+
+
+class DeviceListResponse(BaseModel):
+    """
+    Response model for device listing
+
+    Returns all devices associated with the authenticated user.
+    """
+    devices: List[DeviceInfo] = Field(..., description="List of user's devices")
+    count: int = Field(..., ge=0, description="Number of devices returned")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "devices": [
+                    {
+                        "device_id": "ESP32_001",
+                        "device_name": "Kitchen Water Monitor",
+                        "location": "Main Building - Kitchen",
+                        "registered_at": "2025-01-15T10:30:00Z",
+                        "last_communication": "2025-01-15T12:45:00Z",
+                        "is_active": True,
+                        "api_key_expires_at": None
+                    },
+                    {
+                        "device_id": "ESP32_002",
+                        "device_name": "Bathroom Water Monitor",
+                        "location": "Main Building - Bathroom",
+                        "registered_at": "2025-01-14T09:15:00Z",
+                        "last_communication": "2025-01-15T12:40:00Z",
+                        "is_active": True,
+                        "api_key_expires_at": None
+                    }
+                ],
+                "count": 2
+            }
+        }
+    )
+
+
+class DeviceConfigUpdateRequest(BaseModel):
+    """
+    Request model for updating device configuration
+
+    Regular users can update device_name and location.
+    Admins can additionally update calibration settings.
+    """
+    device_name: Optional[str] = Field(None, min_length=1, max_length=255, description="Updated device name")
+    location: Optional[str] = Field(None, max_length=255, description="Updated device location")
+    calibration: Optional[Dict[str, float]] = Field(None, description="Calibration offsets (admin only)")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "device_name": "Kitchen Water Monitor - Updated",
+                "location": "Main Building - Kitchen Floor 2",
+                "calibration": {
+                    "ph_offset": 0.1,
+                    "turbidity_offset": -0.5,
+                    "temperature_offset": 0.2,
+                    "tds_offset": 5.0
+                }
             }
         }
     )

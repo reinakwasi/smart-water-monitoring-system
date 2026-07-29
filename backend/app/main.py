@@ -32,7 +32,7 @@ logger = get_logger(__name__)
 async def lifespan(app: FastAPI):
     # Startup
     logger.info(f"Starting {settings.app_name}")
-    
+
     # Connect to database
     try:
         await mongodb.connect()
@@ -40,12 +40,12 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Database connection failed: {e}")
         raise
-    
+
     # Load ML models
     try:
         from ml.ml_service import ml_service
         from ml.shap_service import shap_service
-        
+
         if ml_service.is_ready():
             logger.info("ML models loaded")
             shap_service.set_models(
@@ -58,7 +58,7 @@ async def lifespan(app: FastAPI):
             logger.warning("ML models not loaded")
     except Exception as e:
         logger.error(f"ML initialization error: {e}")
-    
+
     # Initialize notifications
     try:
         from app.services.notification_service import initialize_notification_service
@@ -67,9 +67,9 @@ async def lifespan(app: FastAPI):
             logger.info("Notification service ready")
     except Exception as e:
         logger.error(f"Notification service error: {e}")
-    
+
     yield
-    
+
     # Shutdown
     logger.info("Shutting down")
     try:
@@ -135,7 +135,7 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     ssl_config = {}
     if settings.ssl_enabled:
         if settings.ssl_certfile and settings.ssl_keyfile:
@@ -146,7 +146,7 @@ if __name__ == "__main__":
             logger.info("Starting with HTTPS enabled")
         else:
             logger.warning("SSL enabled but no certificates provided")
-    
+
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",

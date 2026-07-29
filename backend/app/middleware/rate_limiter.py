@@ -18,13 +18,13 @@ logger = get_logger(__name__)
 def get_rate_limit_key(request: Request) -> str:
     """
     Get rate limit key from request
-    
+
     Uses IP address as the primary identifier for rate limiting.
     For authenticated requests, could be extended to use user ID.
-    
+
     Args:
         request: FastAPI request object
-        
+
     Returns:
         Rate limit key (IP address)
     """
@@ -43,11 +43,11 @@ limiter = Limiter(
 
 async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
     """
-    Handle rate limit exceeded errors    
+    Handle rate limit exceeded errors
     Args:
         request: FastAPI request object
         exc: RateLimitExceeded exception
-        
+
     Returns:
         JSONResponse with 429 status code
     """
@@ -65,7 +65,7 @@ async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) 
             }
         }
     )
-    
+
     return JSONResponse(
         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
         content={

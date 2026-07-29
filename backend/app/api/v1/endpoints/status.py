@@ -1,6 +1,6 @@
 """Status and historical data endpoints for water quality monitoring"""
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from datetime import datetime, timedelta
 from typing import Optional, List
@@ -8,6 +8,7 @@ import time
 
 from app.db.mongodb import mongodb
 from app.dependencies import get_current_user
+from app.services.data_isolation_service import data_isolation_service, log_admin_access
 from app.models.schemas import (
     CurrentStatusResponse,
     WaterQualityStatus,
@@ -20,9 +21,11 @@ from app.models.schemas import (
     TankStatus,
     SHAPExplanation,
     SHAPFactor,
+    ParameterClassifications,
     ErrorResponse
 )
 from app.utils.logger import get_logger
+from app.config import settings
 
 
 logger = get_logger(__name__)
@@ -33,29 +36,42 @@ router = APIRouter(prefix="/status", tags=["Status"])
 _status_cache = {
     "data": None,
     "timestamp": None,
-    "ttl_seconds": 30
+    "ttl_seconds": 2,
+    "entries": {},
 }
 
 
-def is_cache_valid() -> bool:
+def is_cache_valid(cache_key: Optional[str] = None) -> bool:
     """Check if cached status data is still valid"""
+    if cache_key is not None:
+        entry = _status_cache["entries"].get(cache_key)
+        return bool(entry and time.time() - entry["timestamp"] < _status_cache["ttl_seconds"])
+
     if _status_cache["data"] is None or _status_cache["timestamp"] is None:
         return False
-    
+
     elapsed = time.time() - _status_cache["timestamp"]
     return elapsed < _status_cache["ttl_seconds"]
 
 
-def get_cached_status() -> Optional[dict]:
+def get_cached_status(cache_key: Optional[str] = None) -> Optional[dict]:
     """Get cached status if valid"""
+    if cache_key is not None:
+        entry = _status_cache["entries"].get(cache_key)
+        return entry["data"] if is_cache_valid(cache_key) else None
+
     if is_cache_valid():
         logger.debug("Returning cached status data")
         return _status_cache["data"]
     return None
 
 
-def set_cached_status(data: dict):
+def set_cached_status(data: dict, cache_key: Optional[str] = None):
     """Cache status data with current timestamp"""
+    if cache_key is not None:
+        _status_cache["entries"][cache_key] = {"data": data, "timestamp": time.time()}
+        return
+
     _status_cache["data"] = data
     _status_cache["timestamp"] = time.time()
     logger.debug("Status data cached")
@@ -73,6 +89,7 @@ def set_cached_status(data: dict):
     }
 )
 async def get_current_status(
+    request: Request,
     device_id: Optional[str] = Query(None, description="Filter by specific device ID"),
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(mongodb.get_database)
@@ -83,15 +100,15 @@ async def get_current_status(
     2. Queries latest sensor reading and tank level from MongoDB
     3. Returns current water quality, risk, and tank status
     4. Implements response caching (30 second TTL)
-    
+
     Args:
         device_id: Optional device ID filter
         current_user: Authenticated user from JWT token
         db: MongoDB database instance
-        
+
     Returns:
         CurrentStatusResponse with water quality, contamination risk, and tank status
-        
+
     Raises:
         HTTPException: 404 if no data available
         HTTPException: 500 if query fails
@@ -105,34 +122,74 @@ async def get_current_status(
             }
         }
     )
-    
+
     try:
-        # Check cache first (only if no device_id filter)
-        if device_id is None:
-            cached_data = get_cached_status()
-            if cached_data is not None:
-                logger.info("Returning cached current status")
-                return CurrentStatusResponse(**cached_data)
-        
-        # Build query filter
-        query_filter = {}
-        if device_id:
-            query_filter["device_id"] = device_id
-        
+        user_id = str(current_user["_id"])
+        user_role = current_user.get("role", "user")
+        owned_device_ids: List[str] = []
+        simple_esp32_mode = settings.allow_legacy_device_uploads and not device_id
+        if user_role != "admin":
+            owned_device_ids = await data_isolation_service.get_user_device_ids(user_id, db)
+            if not owned_device_ids and not simple_esp32_mode:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="No devices registered. Please register a device first.",
+                )
+            if device_id and not await data_isolation_service.verify_device_ownership(
+                user_id, device_id, db
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Access denied. Device does not belong to your account.",
+                )
+
+        if user_role != "admin" and simple_esp32_mode:
+            query_filter = {}
+        else:
+            query_filter = await data_isolation_service.build_device_filter(
+                user_id, user_role, db, device_id
+            )
+        if user_role == "admin":
+            await log_admin_access(
+                user_id=user_id,
+                action="read_current_status",
+                endpoint="/status/current-status",
+                device_id=device_id,
+                db=db,
+                ip_address=request.client.host if request.client else None,
+                query_parameters=dict(request.query_params),
+            )
+
+        cache_scope = device_id or ",".join(sorted(owned_device_ids)) or "all-devices"
+        cache_key = f"{user_role}:{user_id}:{cache_scope}"
+        cached_data = get_cached_status(cache_key)
+        if cached_data is not None:
+            return CurrentStatusResponse(**cached_data)
         # Step 1: Query latest sensor reading
         logger.debug("Querying latest sensor reading from database")
         latest_sensor_reading = await db.sensor_readings.find_one(
             query_filter,
-            sort=[("timestamp", -1)]
+            sort=[("created_at", -1), ("timestamp", -1)]
         )
-        
+
+        if latest_sensor_reading is None and simple_esp32_mode and query_filter:
+            logger.info("No owned-device reading found; falling back to latest simple ESP32 reading")
+            query_filter = {}
+            latest_sensor_reading = await db.sensor_readings.find_one(
+                query_filter,
+                sort=[("created_at", -1), ("timestamp", -1)]
+            )
+
         if latest_sensor_reading is None:
             logger.warning("No sensor readings found in database")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="No sensor data available. Please ensure sensors are transmitting data."
             )
-        
+
+        sensor_display_timestamp = latest_sensor_reading.get("created_at") or latest_sensor_reading["timestamp"]
+        tank_display_timestamp = None
+
         logger.debug(
             f"Found latest sensor reading from {latest_sensor_reading['timestamp']}",
             extra={
@@ -142,24 +199,26 @@ async def get_current_status(
                 }
             }
         )
-        
+
         # Step 2: Query latest tank level reading
         logger.debug("Querying latest tank level reading from database")
+        tank_query_filter = query_filter or {"device_id": latest_sensor_reading["device_id"]}
         latest_tank_reading = await db.tank_readings.find_one(
-            query_filter,
-            sort=[("timestamp", -1)]
+            tank_query_filter,
+            sort=[("created_at", -1), ("timestamp", -1)]
         )
-        
+
         if latest_tank_reading is None:
             # Allow the water-quality dashboard to work before a tank sensor is added.
             latest_tank_reading = {
                 "tank_status": "Empty",
                 "level_percent": 0.0,
                 "volume_liters": 0.0,
-                "timestamp": latest_sensor_reading["timestamp"]
+                "timestamp": sensor_display_timestamp
             }
-            logger.warning("No tank readings found; returning an empty tank placeholder")
+            logger.warning("No tank readings found; returning an empty tank status")
         else:
+            tank_display_timestamp = latest_tank_reading.get("created_at") or latest_tank_reading["timestamp"]
             logger.debug(
                 f"Found latest tank reading from {latest_tank_reading['timestamp']}",
                 extra={
@@ -169,17 +228,20 @@ async def get_current_status(
                     }
                 }
             )
-        
+
         # Step 3: Build water quality status
         classification_shap_factors = []
         if "classification_shap_values" in latest_sensor_reading:
             # Get top 3 factors by absolute value
             shap_items = sorted(
-                latest_sensor_reading["classification_shap_values"].items(),
+                (
+                    item for item in latest_sensor_reading["classification_shap_values"].items()
+                    if not item[0].startswith("dissolved_oxygen")
+                ),
                 key=lambda x: abs(x[1]),
                 reverse=True
             )[:3]
-            
+
             classification_shap_factors = [
                 SHAPFactor(
                     feature=feature,
@@ -188,7 +250,17 @@ async def get_current_status(
                 )
                 for feature, value in shap_items
             ]
-        
+
+        # Get parameter classifications from database
+        # If not present (backward compatibility), set empty strings
+        parameter_classifications_dict = latest_sensor_reading.get("parameter_classifications", {})
+        parameter_classifications = ParameterClassifications(
+            ph=parameter_classifications_dict.get("ph", ""),
+            turbidity_index=parameter_classifications_dict.get("turbidity_index", ""),
+            temperature=parameter_classifications_dict.get("temperature", ""),
+            tds=parameter_classifications_dict.get("tds", "")
+        )
+
         water_quality_status = WaterQualityStatus(
             classification=WaterQualityClassification(latest_sensor_reading["classification"]),
             confidence=latest_sensor_reading.get("classification_confidence", 0.0),
@@ -196,26 +268,32 @@ async def get_current_status(
                 "ph": latest_sensor_reading["ph"],
                 "turbidity_index": latest_sensor_reading["turbidity_index"],
                 "temperature": latest_sensor_reading["temperature"],
-                "tds": latest_sensor_reading["tds"],
-                "dissolved_oxygen": latest_sensor_reading.get("dissolved_oxygen", 8.5)
+                "tds": latest_sensor_reading["tds"]
             },
+            parameter_classifications=parameter_classifications,
             shap_explanation=SHAPExplanation(
-                shap_values=latest_sensor_reading.get("classification_shap_values", {}),
+                shap_values={
+                    key: value for key, value in latest_sensor_reading.get("classification_shap_values", {}).items()
+                    if not key.startswith("dissolved_oxygen")
+                },
                 top_factors=classification_shap_factors
             ),
-            timestamp=latest_sensor_reading["timestamp"]
+            timestamp=sensor_display_timestamp
         )
-        
+
         # Step 4: Build contamination risk status
         risk_shap_factors = []
         if "risk_shap_values" in latest_sensor_reading:
             # Get top 3 factors by absolute value
             shap_items = sorted(
-                latest_sensor_reading["risk_shap_values"].items(),
+                (
+                    item for item in latest_sensor_reading["risk_shap_values"].items()
+                    if not item[0].startswith("dissolved_oxygen")
+                ),
                 key=lambda x: abs(x[1]),
                 reverse=True
             )[:3]
-            
+
             risk_shap_factors = [
                 SHAPFactor(
                     feature=feature,
@@ -224,36 +302,37 @@ async def get_current_status(
                 )
                 for feature, value in shap_items
             ]
-        
+
         contamination_risk_status = ContaminationRiskStatus(
             risk_score=latest_sensor_reading.get("risk_score", 0.0),
             risk_level=RiskLevel(latest_sensor_reading.get("risk_level", "Low")),
             shap_explanation=SHAPExplanation(
-                shap_values=latest_sensor_reading.get("risk_shap_values", {}),
+                shap_values={
+                    key: value for key, value in latest_sensor_reading.get("risk_shap_values", {}).items()
+                    if not key.startswith("dissolved_oxygen")
+                },
                 top_factors=risk_shap_factors
             ),
-            timestamp=latest_sensor_reading["timestamp"]
+            timestamp=sensor_display_timestamp
         )
-        
+
         # Step 5: Build tank level status
         tank_level_status = TankLevelStatus(
             status=TankStatus(latest_tank_reading["tank_status"]),
             level_percent=latest_tank_reading["level_percent"],
             volume_liters=latest_tank_reading["volume_liters"],
-            timestamp=latest_tank_reading["timestamp"]
+            timestamp=tank_display_timestamp or latest_tank_reading["timestamp"]
         )
-        
+
         # Step 6: Build complete response
         response_data = {
             "water_quality": water_quality_status,
             "contamination_risk": contamination_risk_status,
             "tank_status": tank_level_status
         }
-        
-        # Cache the response (only if no device_id filter)
-        if device_id is None:
-            set_cached_status(response_data)
-        
+
+        set_cached_status(response_data, cache_key)
+
         logger.info(
             f"Current status retrieved successfully",
             extra={
@@ -265,9 +344,9 @@ async def get_current_status(
                 }
             }
         )
-        
+
         return CurrentStatusResponse(**response_data)
-        
+
     except HTTPException:
         # Re-raise HTTP exceptions
         raise
@@ -300,6 +379,7 @@ async def get_current_status(
     }
 )
 async def get_historical_data(
+    request: Request,
     start_date: datetime = Query(..., description="Start date for historical data (ISO8601 format)"),
     end_date: datetime = Query(..., description="End date for historical data (ISO8601 format)"),
     parameter: Optional[str] = Query(None, description="Filter by specific parameter (ph, turbidity_index, temperature, tds, tank_level, all)"),
@@ -315,7 +395,7 @@ async def get_historical_data(
     3. Queries MongoDB with date range filter and projection
     4. Returns historical readings with pagination
     5. Optimizes query with indexes
-    
+
     Args:
         start_date: Start date for query range
         end_date: End date for query range
@@ -324,10 +404,10 @@ async def get_historical_data(
         limit: Maximum number of records (default: 1000, max: 10000)
         current_user: Authenticated user from JWT token
         db: MongoDB database instance
-        
+
     Returns:
         HistoricalDataResponse with historical data points
-        
+
     Raises:
         HTTPException: 400 if date range is invalid
         HTTPException: 500 if query fails
@@ -345,7 +425,7 @@ async def get_historical_data(
             }
         }
     )
-    
+
     try:
         # Validate date range
         if start_date >= end_date:
@@ -356,7 +436,7 @@ async def get_historical_data(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="start_date must be before end_date"
             )
-        
+
         # Check if date range exceeds 30 days (warn but allow)
         date_range_days = (end_date - start_date).days
         if date_range_days > 30:
@@ -369,7 +449,7 @@ async def get_historical_data(
                     }
                 }
             )
-        
+
         # Validate parameter filter
         valid_parameters = ["ph", "turbidity_index", "temperature", "tds", "tank_level", "all", None]
         if parameter not in valid_parameters:
@@ -378,18 +458,47 @@ async def get_historical_data(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid parameter. Must be one of: {', '.join([p for p in valid_parameters if p is not None])}"
             )
-        
-        # Build query filter
-        query_filter = {
-            "timestamp": {
-                "$gte": start_date,
-                "$lte": end_date
-            }
-        }
-        
-        if device_id:
-            query_filter["device_id"] = device_id
-        
+
+        user_id = str(current_user["_id"])
+        user_role = current_user.get("role", "user")
+        owned_device_ids: List[str] = []
+        simple_esp32_mode = settings.allow_legacy_device_uploads and not device_id
+        if user_role != "admin":
+            owned_device_ids = await data_isolation_service.get_user_device_ids(user_id, db)
+            if not owned_device_ids and not simple_esp32_mode:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="No devices registered. Please register a device first.",
+                )
+            if device_id and not await data_isolation_service.verify_device_ownership(
+                user_id, device_id, db
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Access denied. Device does not belong to your account.",
+                )
+
+        if user_role != "admin" and simple_esp32_mode:
+            device_filter = {}
+        else:
+            device_filter = await data_isolation_service.build_device_filter(
+                user_id, user_role, db, device_id
+            )
+        query_filter = {**device_filter, "timestamp": {
+            "$gte": start_date,
+            "$lte": end_date,
+        }}
+        if user_role == "admin":
+            await log_admin_access(
+                user_id=user_id,
+                action="read_historical_data",
+                endpoint="/status/historical-data",
+                device_id=device_id,
+                db=db,
+                ip_address=request.client.host if request.client else None,
+                query_parameters=dict(request.query_params),
+            )
+
         # Step 1: Query sensor readings with date range filter
         logger.debug(
             f"Querying sensor readings with filter: {query_filter}",
@@ -400,68 +509,109 @@ async def get_historical_data(
                 }
             }
         )
-        
+
         sensor_cursor = db.sensor_readings.find(
             query_filter,
-            sort=[("timestamp", 1)]  # Ascending order (oldest to newest)
+            sort=[("created_at", 1), ("timestamp", 1)]  # Ascending order (oldest to newest)
         ).limit(limit)
-        
+
         sensor_readings = []
         async for reading in sensor_cursor:
             sensor_readings.append(reading)
-        
+
+        if not sensor_readings and simple_esp32_mode and device_filter:
+            logger.info("No owned-device history found; falling back to simple ESP32 history")
+            device_filter = {}
+            query_filter = {"timestamp": {
+                "$gte": start_date,
+                "$lte": end_date,
+            }}
+            sensor_cursor = db.sensor_readings.find(
+                query_filter,
+                sort=[("created_at", 1), ("timestamp", 1)]
+            ).limit(limit)
+            sensor_readings = []
+            async for reading in sensor_cursor:
+                sensor_readings.append(reading)
+
         logger.debug(f"Found {len(sensor_readings)} sensor readings")
-        
-        # Step 2: Query tank readings with same filter
+
+        # Query tank readings from the same period. Water and tank messages are sent
+        # separately, so they are matched by nearest timestamp instead of exact time.
         logger.debug("Querying tank readings")
         tank_cursor = db.tank_readings.find(
             query_filter,
-            sort=[("timestamp", 1)]
+            sort=[("created_at", 1), ("timestamp", 1)]
         ).limit(limit)
-        
-        tank_readings = {}
+
+        tank_readings = []
         async for reading in tank_cursor:
-            # Index by timestamp for easy lookup
-            tank_readings[reading["timestamp"]] = reading
-        
+            tank_readings.append(reading)
+
         logger.debug(f"Found {len(tank_readings)} tank readings")
-        
-        # Step 3: Build historical data points
+
+        def record_time(record: dict) -> Optional[datetime]:
+            value = record.get("created_at") or record.get("timestamp")
+            return value if isinstance(value, datetime) else None
+
+        def nearest_tank_reading(sensor_reading: dict) -> Optional[dict]:
+            sensor_time = record_time(sensor_reading)
+            if sensor_time is None:
+                return None
+
+            sensor_device_id = sensor_reading.get("device_id")
+            candidates = [
+                tank for tank in tank_readings
+                if not sensor_device_id or tank.get("device_id") == sensor_device_id
+            ]
+            if not candidates:
+                return None
+
+            best = min(
+                candidates,
+                key=lambda tank: abs(((record_time(tank) or sensor_time) - sensor_time).total_seconds())
+            )
+            best_time = record_time(best)
+            if best_time is None:
+                return None
+
+            return best if abs((best_time - sensor_time).total_seconds()) <= 120 else None
+
+        # Build historical data points
         historical_data: List[HistoricalDataPoint] = []
-        
+
         for sensor_reading in sensor_readings:
             # Build parameters dict based on filter
             parameters = {}
-            
+
             if parameter is None or parameter == "all":
                 parameters = {
                     "ph": sensor_reading["ph"],
                     "turbidity_index": sensor_reading["turbidity_index"],
                     "temperature": sensor_reading["temperature"],
-                    "tds": sensor_reading["tds"],
-                    "dissolved_oxygen": sensor_reading.get("dissolved_oxygen", 8.5)
+                    "tds": sensor_reading["tds"]
                 }
-            elif parameter in ["ph", "turbidity_index", "temperature", "tds", "dissolved_oxygen"]:
-                parameters[parameter] = sensor_reading.get(parameter, 8.5 if parameter == "dissolved_oxygen" else 0.0)
-            
-            # Get tank level if available and requested
+            elif parameter in ["ph", "turbidity_index", "temperature", "tds"]:
+                parameters[parameter] = sensor_reading.get(parameter, 0.0)
+
+            # Get the nearest tank level for this water reading when available.
             tank_level_percent = None
             if parameter is None or parameter == "all" or parameter == "tank_level":
-                tank_reading = tank_readings.get(sensor_reading["timestamp"])
+                tank_reading = nearest_tank_reading(sensor_reading)
                 if tank_reading:
                     tank_level_percent = tank_reading["level_percent"]
-            
+
             # Create historical data point
             data_point = HistoricalDataPoint(
-                timestamp=sensor_reading["timestamp"],
+                timestamp=sensor_reading.get("created_at") or sensor_reading["timestamp"],
                 parameters=parameters,
                 classification=WaterQualityClassification(sensor_reading["classification"]),
                 risk_score=sensor_reading.get("risk_score", 0.0),
                 tank_level_percent=tank_level_percent
             )
-            
+
             historical_data.append(data_point)
-        
+
         # Step 4: Build response
         response = HistoricalDataResponse(
             data=historical_data,
@@ -469,7 +619,7 @@ async def get_historical_data(
             start_date=start_date,
             end_date=end_date
         )
-        
+
         logger.info(
             f"Historical data retrieved successfully: {len(historical_data)} records",
             extra={
@@ -481,9 +631,9 @@ async def get_historical_data(
                 }
             }
         )
-        
+
         return response
-        
+
     except HTTPException:
         # Re-raise HTTP exceptions
         raise

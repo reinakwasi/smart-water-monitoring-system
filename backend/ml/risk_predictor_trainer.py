@@ -28,13 +28,13 @@ from sklearn.metrics import (
 class RiskPredictorTrainer:
     """
     XGBoost trainer for contamination risk prediction
-    
+
     Handles:
     - Training XGBoost with hyperparameter tuning
     - K-fold cross-validation (k=5)
     - Model evaluation with multiple metrics including AUC-ROC
     - Model persistence with versioning    """
-    
+
     def __init__(
         self,
         model_dir: str = "ml/models",
@@ -43,7 +43,7 @@ class RiskPredictorTrainer:
     ):
         """
         Initialize RiskPredictorTrainer
-        
+
         Args:
             model_dir: Directory to save trained models
             random_state: Random seed for reproducibility
@@ -56,7 +56,7 @@ class RiskPredictorTrainer:
         self.model: Optional[Any] = None
         self.best_params: Optional[Dict[str, Any]] = None
         self.feature_names: Optional[list] = None
-    
+
     def train(
         self,
         X_train: np.ndarray,
@@ -66,19 +66,19 @@ class RiskPredictorTrainer:
         param_grid: Optional[Dict[str, list]] = None
     ):
         """
-        Train XGBoost model with optional hyperparameter tuning        
+        Train XGBoost model with optional hyperparameter tuning
         Args:
             X_train: Training feature matrix (with temporal features)
             y_train: Training target (risk scores or levels)
             feature_names: Optional list of feature names
             hyperparameter_tuning: Whether to perform grid search for hyperparameters
             param_grid: Custom parameter grid for grid search
-            
+
         Returns:
             Trained XGBoost model
         """
         self.feature_names = feature_names
-        
+
         if hyperparameter_tuning:
             # Default parameter grid if not provided
             if param_grid is None:
@@ -90,7 +90,7 @@ class RiskPredictorTrainer:
                     'colsample_bytree': [0.7, 0.8, 0.9, 1.0],
                     'min_child_weight': [1, 3, 5]
                 }
-            
+
             # Create base model based on task type
             if self.task_type == "classification":
                 base_model = XGBClassifier(
@@ -106,7 +106,7 @@ class RiskPredictorTrainer:
                     eval_metric='rmse'
                 )
                 scoring = 'neg_mean_squared_error'
-            
+
             # Perform grid search with cross-validation
             print("Performing hyperparameter tuning with GridSearchCV...")
             grid_search = GridSearchCV(
@@ -116,13 +116,13 @@ class RiskPredictorTrainer:
                 n_jobs=-1,
                 verbose=1
             )
-            
+
             grid_search.fit(X_train, y_train)
-            
+
             # Get best model and parameters
             self.model = grid_search.best_estimator_
             self.best_params = grid_search.best_params_
-            
+
             print(f"Best parameters: {self.best_params}")
             print(f"Best cross-validation score: {grid_search.best_score_:.4f}")
         else:
@@ -151,12 +151,12 @@ class RiskPredictorTrainer:
                     n_jobs=-1,
                     eval_metric='rmse'
                 )
-            
+
             print("Training XGBoost risk predictor...")
             self.model.fit(X_train, y_train)
-        
+
         return self.model
-    
+
     def cross_validate(
         self,
         X: np.ndarray,
@@ -164,23 +164,23 @@ class RiskPredictorTrainer:
         cv: int = 5
     ) -> Dict[str, float]:
         """
-        Perform k-fold cross-validation on the model        
+        Perform k-fold cross-validation on the model
         Args:
             X: Feature matrix
             y: Target values
             cv: Number of folds (default 5)
-            
+
         Returns:
             Dictionary with cross-validation scores
-            
+
         Raises:
             ValueError: If model has not been trained
         """
         if self.model is None:
             raise ValueError("Model must be trained before cross-validation")
-        
+
         print(f"Performing {cv}-fold cross-validation...")
-        
+
         if self.task_type == "classification":
             # Compute cross-validation scores for classification metrics
             accuracy_scores = cross_val_score(
@@ -195,7 +195,7 @@ class RiskPredictorTrainer:
             f1_scores = cross_val_score(
                 self.model, X, y, cv=cv, scoring='f1_weighted', n_jobs=-1
             )
-            
+
             cv_results = {
                 'accuracy_mean': float(accuracy_scores.mean()),
                 'accuracy_std': float(accuracy_scores.std()),
@@ -217,7 +217,7 @@ class RiskPredictorTrainer:
             r2_scores = cross_val_score(
                 self.model, X, y, cv=cv, scoring='r2', n_jobs=-1
             )
-            
+
             cv_results = {
                 'mse_mean': float(-mse_scores.mean()),
                 'mse_std': float(mse_scores.std()),
@@ -227,49 +227,49 @@ class RiskPredictorTrainer:
                 'r2_mean': float(r2_scores.mean()),
                 'r2_std': float(r2_scores.std())
             }
-        
+
         return cv_results
-    
+
     def evaluate(
         self,
         X_test: np.ndarray,
         y_test: np.ndarray
     ) -> Dict[str, Any]:
         """
-        Evaluate model on test data        
+        Evaluate model on test data
         Args:
             X_test: Test feature matrix
             y_test: Test target values
-            
+
         Returns:
             Dictionary containing evaluation metrics
-            
+
         Raises:
             ValueError: If model has not been trained
         """
         if self.model is None:
             raise ValueError("Model must be trained before evaluation")
-        
+
         print("Evaluating model on test data...")
-        
+
         # Make predictions
         y_pred = self.model.predict(X_test)
-        
+
         evaluation_results = {}
-        
+
         if self.task_type == "classification":
             # Classification metrics
             accuracy = accuracy_score(y_test, y_pred)
             precision = precision_score(y_test, y_pred, average='weighted', zero_division=0)
             recall = recall_score(y_test, y_pred, average='weighted', zero_division=0)
             f1 = f1_score(y_test, y_pred, average='weighted', zero_division=0)
-            
+
             # Confusion matrix
             cm = confusion_matrix(y_test, y_pred)
-            
+
             # Classification report
             class_report = classification_report(y_test, y_pred, output_dict=True, zero_division=0)
-            
+
             # AUC-ROC (if binary or multi-class with probabilities)
             try:
                 y_pred_proba = self.model.predict_proba(X_test)
@@ -283,7 +283,7 @@ class RiskPredictorTrainer:
             except Exception as e:
                 print(f"Could not compute AUC-ROC: {e}")
                 evaluation_results['auc_roc'] = None
-            
+
             evaluation_results.update({
                 'accuracy': float(accuracy),
                 'precision': float(precision),
@@ -292,7 +292,7 @@ class RiskPredictorTrainer:
                 'confusion_matrix': cm.tolist(),
                 'classification_report': class_report
             })
-            
+
             print(f"Accuracy: {accuracy:.4f}")
             print(f"Precision: {precision:.4f}")
             print(f"Recall: {recall:.4f}")
@@ -305,19 +305,19 @@ class RiskPredictorTrainer:
             rmse = np.sqrt(mse)
             mae = mean_absolute_error(y_test, y_pred)
             r2 = r2_score(y_test, y_pred)
-            
+
             evaluation_results.update({
                 'mse': float(mse),
                 'rmse': float(rmse),
                 'mae': float(mae),
                 'r2_score': float(r2)
             })
-            
+
             print(f"MSE: {mse:.4f}")
             print(f"RMSE: {rmse:.4f}")
             print(f"MAE: {mae:.4f}")
             print(f"R²: {r2:.4f}")
-        
+
         # Get feature importances
         feature_importances = None
         if self.feature_names is not None:
@@ -330,11 +330,11 @@ class RiskPredictorTrainer:
             feature_importances = dict(
                 sorted(feature_importances.items(), key=lambda x: x[1], reverse=True)
             )
-        
+
         evaluation_results['feature_importances'] = feature_importances
-        
+
         return evaluation_results
-    
+
     def generate_evaluation_report(
         self,
         X_train: np.ndarray,
@@ -343,27 +343,27 @@ class RiskPredictorTrainer:
         y_test: np.ndarray
     ) -> Dict[str, Any]:
         """
-        Generate comprehensive evaluation report        
+        Generate comprehensive evaluation report
         Args:
             X_train: Training feature matrix
             y_train: Training target values
             X_test: Test feature matrix
             y_test: Test target values
-            
+
         Returns:
             Dictionary containing complete evaluation report
         """
         print("Generating evaluation report...")
-        
+
         # Perform cross-validation on training data
         cv_results = self.cross_validate(X_train, y_train, cv=5)
-        
+
         # Evaluate on test data
         test_results = self.evaluate(X_test, y_test)
-        
+
         # Combine results
         model_type = 'XGBClassifier' if self.task_type == 'classification' else 'XGBRegressor'
-        
+
         report = {
             'model_type': model_type,
             'task_type': self.task_type,
@@ -375,41 +375,41 @@ class RiskPredictorTrainer:
             'hyperparameters': self.best_params if self.best_params else self.model.get_params(),
             'timestamp': datetime.utcnow().isoformat()
         }
-        
+
         return report
-    
+
     def save_model(
         self,
         version: str = "v1.0",
         metadata: Optional[Dict[str, Any]] = None
     ) -> Tuple[Path, Path]:
         """
-        Save trained model with versioning and metadata        
+        Save trained model with versioning and metadata
         Args:
             version: Model version string (e.g., "v1.0", "v2.1")
             metadata: Optional metadata dictionary to save with model
-            
+
         Returns:
             Tuple of (model_path, metadata_path)
-            
+
         Raises:
             ValueError: If model has not been trained
         """
         if self.model is None:
             raise ValueError("Model must be trained before saving")
-        
+
         # Create version directory
         version_dir = self.model_dir / f"risk_predictor_{version}"
         version_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Save model
         model_path = version_dir / "model.joblib"
         joblib.dump(self.model, model_path)
         print(f"Model saved to: {model_path}")
-        
+
         # Prepare metadata
         model_type = 'XGBClassifier' if self.task_type == 'classification' else 'XGBRegressor'
-        
+
         model_metadata = {
             'version': version,
             'model_type': model_type,
@@ -419,45 +419,45 @@ class RiskPredictorTrainer:
             'n_features': self.model.n_features_in_,
             'saved_at': datetime.utcnow().isoformat()
         }
-        
+
         # Add classes for classification
         if self.task_type == 'classification':
             model_metadata['n_classes'] = len(self.model.classes_)
             model_metadata['classes'] = self.model.classes_.tolist()
-        
+
         # Add custom metadata if provided
         if metadata is not None:
             model_metadata.update(metadata)
-        
+
         # Save metadata
         metadata_path = version_dir / "metadata.json"
         with open(metadata_path, 'w') as f:
             json.dump(model_metadata, f, indent=2)
         print(f"Metadata saved to: {metadata_path}")
-        
+
         return model_path, metadata_path
-    
+
     def load_model(self, version: str = "v1.0"):
         """
-        Load a trained model from disk        
+        Load a trained model from disk
         Args:
             version: Model version string to load
-            
+
         Returns:
             Loaded XGBoost model
-            
+
         Raises:
             FileNotFoundError: If model file does not exist
         """
         version_dir = self.model_dir / f"risk_predictor_{version}"
         model_path = version_dir / "model.joblib"
-        
+
         if not model_path.exists():
             raise FileNotFoundError(f"Model not found: {model_path}")
-        
+
         self.model = joblib.load(model_path)
         print(f"Model loaded from: {model_path}")
-        
+
         # Load metadata if available
         metadata_path = version_dir / "metadata.json"
         if metadata_path.exists():
@@ -466,5 +466,5 @@ class RiskPredictorTrainer:
                 self.feature_names = metadata.get('feature_names')
                 self.best_params = metadata.get('hyperparameters')
                 self.task_type = metadata.get('task_type', 'classification')
-        
+
         return self.model

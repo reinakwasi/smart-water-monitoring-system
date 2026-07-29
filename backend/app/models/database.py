@@ -8,30 +8,30 @@ from pydantic import BaseModel, Field, ConfigDict
 class SensorReadingDocument(BaseModel):
     """
     MongoDB document model for sensor readings
-    
+
     Collection: sensor_readings    """
     device_id: str
     timestamp: datetime
-    
+
     # Sensor parameters
     ph: float
-    turbidity_index: float  # 0-100 relative scale, self-calibrated
+    turbidity_index: float  # Turbidity in NTU
     temperature: float
     tds: float
-    
+
     # ML predictions
     classification: str  # Safe, Warning, Unsafe
     classification_confidence: float
     risk_score: float
     risk_level: str  # Low, Medium, High
-    
+
     # SHAP explanations
     classification_shap_values: Dict[str, float]
     risk_shap_values: Dict[str, float]
-    
+
     # Metadata
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -66,21 +66,21 @@ class SensorReadingDocument(BaseModel):
 class TankReadingDocument(BaseModel):
     """
     MongoDB document model for tank level readings
-    
+
     Collection: tank_readings    """
     device_id: str
     timestamp: datetime
-    
+
     # Tank measurements
     distance_cm: float
     tank_height_cm: float
     level_percent: float
     volume_liters: float
     tank_status: str  # Empty, Half_Full, Full, Overflow
-    
+
     # Metadata
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -100,29 +100,29 @@ class TankReadingDocument(BaseModel):
 class UserDocument(BaseModel):
     """
     MongoDB document model for users
-    
+
     Collection: users    """
     email: str
     password_hash: str
     full_name: str
     role: str
-    
+
     phone: Optional[str] = None
     location: Optional[str] = None
     profile_picture: Optional[str] = None
-    
+
     fcm_token: Optional[str] = None
-    
+
     alert_on_unsafe: bool = True
     alert_on_high_risk: bool = True
     alert_on_tank_critical: bool = True
     push_enabled: bool = True
-    
+
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     last_login: Optional[datetime] = None
     is_active: bool = True
-    
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -146,13 +146,13 @@ class UserDocument(BaseModel):
 class SensorDeviceDocument(BaseModel):
     """
     MongoDB document model for sensor devices
-    
+
     Collection: sensor_devices    """
     device_id: str
     device_name: str
     location: Optional[str] = None  # Physical location of device
     ip_address: Optional[str] = None  # Device IP address
-    
+
     # Calibration offsets
     calibration: Dict[str, float] = Field(
         default_factory=lambda: {
@@ -162,15 +162,15 @@ class SensorDeviceDocument(BaseModel):
             "tds_offset": 0.0
         }
     )
-    
+
     # Device status
     is_online: bool = True
     last_communication: datetime = Field(default_factory=datetime.utcnow)
-    
+
     # Metadata
     registered_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
-    
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -194,13 +194,13 @@ class SensorDeviceDocument(BaseModel):
 class SystemConfigDocument(BaseModel):
     """
     MongoDB document model for system configuration
-    
+
     Collection: system_config    """
     config_id: str = "default"  # Single document with fixed ID
-    
+
     # Sensor polling configuration
     sensor_polling_interval_seconds: int = 30
-    
+
     # Water quality thresholds
     quality_thresholds: Dict[str, Dict[str, float]] = Field(
         default_factory=lambda: {
@@ -226,7 +226,7 @@ class SystemConfigDocument(BaseModel):
             }
         }
     )
-    
+
     # Risk thresholds
     risk_thresholds: Dict[str, float] = Field(
         default_factory=lambda: {
@@ -234,7 +234,7 @@ class SystemConfigDocument(BaseModel):
             "medium_max": 0.7
         }
     )
-    
+
     # Tank dimensions
     tank_dimensions: Dict[str, float] = Field(
         default_factory=lambda: {
@@ -243,11 +243,11 @@ class SystemConfigDocument(BaseModel):
             "capacity_liters": 1570.8  # π * r² * h
         }
     )
-    
+
     # Metadata
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     updated_by: Optional[str] = None  # User ID who last updated
-    
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -280,26 +280,26 @@ class SystemConfigDocument(BaseModel):
 class NotificationLogDocument(BaseModel):
     """
     MongoDB document model for notification logs
-    
+
     Collection: notification_logs    """
     notification_type: str  # quality_change, risk_change, tank_status
     user_id: str
     device_id: str
-    
+
     # Notification content
     title: str
     body: str
     priority: str  # normal, high
-    
+
     # Notification status
     sent_at: datetime = Field(default_factory=datetime.utcnow)
     delivery_status: str = "sent"  # sent, failed, delivered
     fcm_response: Optional[Dict] = None
     is_read: bool = False  # Whether user has read the notification
-    
+
     # Related data
     related_reading_id: Optional[str] = None
-    
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {

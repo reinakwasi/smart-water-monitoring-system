@@ -15,26 +15,26 @@ const int NUM_REGULAR = 4;
 void setup() {
   Serial.begin(115200);
   delay(2000);
-  
+
   Serial.println("\n╔════════════════════════════════════╗");
   Serial.println("║  ESP32 PIN TEST V2                 ║");
   Serial.println("║  Proper ADC pin testing            ║");
   Serial.println("╚════════════════════════════════════╝\n");
-  
+
   analogReadResolution(12);
   analogSetAttenuation(ADC_11db);
-  
+
   // Test input-only pins
   Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   Serial.println("INPUT-ONLY PINS (D36, D39):");
   Serial.println("These have NO pull-up resistors");
   Serial.println("Reading 0 is NORMAL for these pins!");
   Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
-  
+
   for(int i = 0; i < NUM_INPUT_ONLY; i++) {
     int pin = INPUT_ONLY_PINS[i];
     analogSetPinAttenuation(pin, ADC_11db);
-    
+
     long total = 0;
     for(int j = 0; j < 10; j++) {
       total += analogRead(pin);
@@ -42,7 +42,7 @@ void setup() {
     }
     int avg = total / 10;
     float voltage = avg * (3.3 / 4095.0);
-    
+
     Serial.print(INPUT_ONLY_NAMES[i]);
     Serial.print(": ADC=");
     Serial.print(avg);
@@ -51,19 +51,19 @@ void setup() {
     Serial.print("V) ");
     Serial.println("✓ OK (any value normal)");
   }
-  
+
   // Test regular pins
   Serial.println("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   Serial.println("REGULAR ADC PINS (D34,D35,D32,D33):");
   Serial.println("These MUST read HIGH (~3.3V)!");
   Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
-  
+
   bool allRegularOK = true;
-  
+
   for(int i = 0; i < NUM_REGULAR; i++) {
     int pin = REGULAR_PINS[i];
     analogSetPinAttenuation(pin, ADC_11db);
-    
+
     long total = 0;
     for(int j = 0; j < 10; j++) {
       total += analogRead(pin);
@@ -71,14 +71,14 @@ void setup() {
     }
     int avg = total / 10;
     float voltage = avg * (3.3 / 4095.0);
-    
+
     Serial.print(REGULAR_NAMES[i]);
     Serial.print(": ADC=");
     Serial.print(avg);
     Serial.print(" (");
     Serial.print(voltage, 2);
     Serial.print("V) ");
-    
+
     if(avg == 0) {
       Serial.println("✗ SHORTED!");
       allRegularOK = false;
@@ -91,7 +91,7 @@ void setup() {
       allRegularOK = false;
     }
   }
-  
+
   // Summary
   Serial.println("\n════════════════════════════════════");
   if(allRegularOK) {

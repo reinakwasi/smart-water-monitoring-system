@@ -5,6 +5,7 @@ import asyncio
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime, timedelta
 from motor.motor_asyncio import AsyncIOMotorDatabase
+from bson import ObjectId
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -13,14 +14,14 @@ logger = get_logger(__name__)
 class NotificationService:
     """
     Firebase Cloud Messaging notification service
-    
+
     Provides methods to send notifications for water quality changes, contamination risk alerts,
     and tank status updates with built-in throttling and retry logic.    """
-    
+
     def __init__(self, fcm_server_key: str):
         """
         Initialize notification service
-        
+
         Args:
             fcm_server_key: Firebase Cloud Messaging server key
         """
@@ -30,23 +31,25 @@ class NotificationService:
         self.throttle_duration = timedelta(hours=1)  # 1 hour cooldown per notification type
         self.max_retries = 3
         self.retry_delays = [1, 2, 4]  # Exponential backoff delays in seconds
-    
+
     async def send_quality_change_notification(
         self,
-        user_tokens: List[Tuple[str, Dict]],  # Changed to include user preferences
+        user_tokens: List[Tuple[str, Dict]],
         old_quality: str,
         new_quality: str,
-        top_factor: str
+        top_factor: str,
+        device_id: str = "",
+        device_name: str = "Device",
     ) -> bool:
         """
         Send notification when water quality classification changes
-        
+
         Args:
             user_tokens: List of tuples (FCM token, user preferences dict)
             old_quality: Previous water quality classification
             new_quality: New water quality classification
             top_factor: Top contributing factor from SHAP analysis
-            
+
         Returns:
             bool: True if notification sent successfully, False otherwise
         """
@@ -55,14 +58,14 @@ class NotificationService:
             token for token, prefs in user_tokens
             if prefs.get('alert_on_unsafe', True) and prefs.get('push_enabled', True)
         ]
-        
+
         if not filtered_tokens:
             logger.info("No users with quality alert preferences enabled")
             return False
-        
-        notification_key = f"quality_{new_quality}"
-        
-        # Check throttling (Requirement 8.7)
+
+        notification_key = f"quality_{device_id}_{new_quality}"
+
+        # Check throttling
         if self._should_throttle(notification_key):
             logger.info(
                 f"Quality change notification throttled for {new_quality}",
@@ -75,20 +78,22 @@ class NotificationService:
                 }
             )
             return False
-        
-        # Determine priority based on quality level (Requirement 8.2)
+
+        # Determine priority based on quality level
         priority = "high" if new_quality == "Unsafe" else "normal"
-        
-        # Format notification message (Requirement 8.5, 8.6)
-        title, body = self._format_quality_message(old_quality, new_quality, top_factor)
-        
+
+        # Format notification message
+        title, _ = self._format_quality_message(old_quality, new_quality, top_factor)
+        title = f"{device_name}: {title}"
+        body = f"Device '{device_name}' quality changed from {old_quality} to {new_quality}. Main factor: {top_factor}."
+
         # Send notification with retry logic
         success = await self._send_fcm_notification_with_retry(
             filtered_tokens, title, body, priority, notification_type="quality_change"
         )
-        
+
         if success:
-            # Update throttle cache (Requirement 8.7)
+            # Update throttle cache
             self._update_throttle_cache(notification_key)
             logger.info(
                 f"Quality change notification sent successfully: {old_quality} -> {new_quality}",
@@ -102,21 +107,23 @@ class NotificationService:
                     }
                 }
             )
-        
+
         return success
-    
+
     async def send_risk_change_notification(
         self,
         user_tokens: List[Tuple[str, Dict]],
         risk_level: str,
-        risk_score: float
+        risk_score: float,
+        device_id: str = "",
+        device_name: str = "Device",
     ) -> bool:
         """
         Send notification when contamination risk level increases        Args:
             user_tokens: List of tuples (FCM token, user preferences dict)
             risk_level: Risk level (Low, Medium, High)
             risk_score: Risk score (0.0 - 1.0)
-            
+
         Returns:
             bool: True if notification sent successfully, False otherwise
         """
@@ -125,13 +132,13 @@ class NotificationService:
             token for token, prefs in user_tokens
             if prefs.get('alert_on_high_risk', True) and prefs.get('push_enabled', True)
         ]
-        
+
         if not filtered_tokens:
             logger.info("No users with high risk alert preferences enabled")
             return False
-        
-        notification_key = f"risk_{risk_level}"
-        
+
+        notification_key = f"risk_{device_id}_{risk_level}"
+
         # Check throttling
         if self._should_throttle(notification_key):
             logger.info(
@@ -145,16 +152,16 @@ class NotificationService:
                 }
             )
             return False
-        
+
         # Format notification message
-        title = f"Contamination Risk: {risk_level}"
-        body = f"Risk score: {risk_score:.2f}. Monitor water quality closely."
-        
+        title = f"{device_name}: Contamination Risk {risk_level}"
+        body = f"Device '{device_name}' ({device_id}) risk score is {risk_score:.2f}."
+
         # Send notification with retry logic
         success = await self._send_fcm_notification_with_retry(
             filtered_tokens, title, body, "normal", notification_type="risk_change"
         )
-        
+
         if success:
             # Update throttle cache
             self._update_throttle_cache(notification_key)
@@ -168,21 +175,23 @@ class NotificationService:
                     }
                 }
             )
-        
+
         return success
-    
+
     async def send_tank_notification(
         self,
         user_tokens: List[Tuple[str, Dict]],
         tank_status: str,
-        level_percent: float
+        level_percent: float,
+        device_id: str = "",
+        device_name: str = "Device",
     ) -> bool:
         """
         Send notification for tank level changes        Args:
             user_tokens: List of tuples (FCM token, user preferences dict)
             tank_status: Tank status (Empty, Low, Half_Full, Full, Overflow)
             level_percent: Tank level percentage
-            
+
         Returns:
             bool: True if notification sent successfully, False otherwise
         """
@@ -191,13 +200,13 @@ class NotificationService:
             token for token, prefs in user_tokens
             if prefs.get('alert_on_tank_critical', True) and prefs.get('push_enabled', True)
         ]
-        
+
         if not filtered_tokens:
             logger.info("No users with tank critical alert preferences enabled")
             return False
-        
-        notification_key = f"tank_{tank_status}"
-        
+
+        notification_key = f"tank_{device_id}_{tank_status}"
+
         # Check throttling
         if self._should_throttle(notification_key):
             logger.info(
@@ -211,18 +220,20 @@ class NotificationService:
                 }
             )
             return False
-        
+
         # Determine priority based on tank status
         priority = "high" if tank_status == "Overflow" else "normal"
-        
+
         # Format notification message
-        title, body = self._format_tank_message(tank_status, level_percent)
-        
+        title, _ = self._format_tank_message(tank_status, level_percent)
+        title = f"{device_name}: {title}"
+        body = f"Device '{device_name}' ({device_id}) tank is {tank_status} at {level_percent:.1f}%."
+
         # Send notification with retry logic
         success = await self._send_fcm_notification_with_retry(
             filtered_tokens, title, body, priority, notification_type="tank_status"
         )
-        
+
         if success:
             # Update throttle cache
             self._update_throttle_cache(notification_key)
@@ -237,9 +248,9 @@ class NotificationService:
                     }
                 }
             )
-        
+
         return success
-    
+
     async def _send_fcm_notification_with_retry(
         self,
         tokens: List[str],
@@ -250,31 +261,31 @@ class NotificationService:
     ) -> bool:
         """
         Send FCM notification with retry logic
-        
+
         Args:
             tokens: List of FCM device tokens
             title: Notification title
             body: Notification body
             priority: Notification priority (normal, high)
             notification_type: Type of notification for logging
-            
+
         Returns:
             bool: True if notification sent successfully, False otherwise
         """
         if not tokens:
             logger.warning(f"No FCM tokens provided for {notification_type} notification")
             return False
-        
+
         if not self.fcm_server_key:
             logger.error(f"FCM server key not configured for {notification_type} notification")
             return False
-        
+
         for attempt in range(self.max_retries):
             try:
                 success = await self._send_fcm_notification(tokens, title, body, priority)
                 if success:
                     return True
-                
+
                 # If not the last attempt, wait before retrying
                 if attempt < self.max_retries - 1:
                     delay = self.retry_delays[attempt]
@@ -289,7 +300,7 @@ class NotificationService:
                         }
                     )
                     await asyncio.sleep(delay)
-                
+
             except Exception as e:
                 logger.error(
                     f"FCM notification attempt {attempt + 1} failed with exception: {str(e)}",
@@ -302,12 +313,12 @@ class NotificationService:
                     },
                     exc_info=True
                 )
-                
+
                 # If not the last attempt, wait before retrying
                 if attempt < self.max_retries - 1:
                     delay = self.retry_delays[attempt]
                     await asyncio.sleep(delay)
-        
+
         logger.error(
             f"FCM notification failed after {self.max_retries} attempts",
             extra={
@@ -318,7 +329,7 @@ class NotificationService:
             }
         )
         return False
-    
+
     async def _send_fcm_notification(
         self,
         tokens: List[str],
@@ -328,16 +339,16 @@ class NotificationService:
     ) -> bool:
         """
         Send notification via Firebase Cloud Messaging
-        
+
         Args:
             tokens: List of FCM device tokens
             title: Notification title
             body: Notification body
             priority: Notification priority (normal, high)
-            
+
         Returns:
             bool: True if notification sent successfully, False otherwise
-            
+
         Raises:
             httpx.HTTPError: If HTTP request fails
         """
@@ -345,7 +356,7 @@ class NotificationService:
             "Authorization": f"key={self.fcm_server_key}",
             "Content-Type": "application/json"
         }
-        
+
         payload = {
             "registration_ids": tokens,
             "priority": priority,
@@ -359,7 +370,7 @@ class NotificationService:
                 "priority": priority
             }
         }
-        
+
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 self.fcm_url,
@@ -367,13 +378,13 @@ class NotificationService:
                 headers=headers,
                 timeout=10.0
             )
-            
+
             if response.status_code == 200:
                 # Parse FCM response to check for errors
                 fcm_response = response.json()
                 success_count = fcm_response.get("success", 0)
                 failure_count = fcm_response.get("failure", 0)
-                
+
                 if success_count > 0:
                     logger.debug(
                         f"FCM notification sent successfully to {success_count} devices",
@@ -409,39 +420,39 @@ class NotificationService:
                 )
                 response.raise_for_status()
                 return False
-    
+
     def _should_throttle(self, notification_key: str) -> bool:
         """
         Check if notification should be throttled
-        
+
         Args:
             notification_key: Unique key for notification type
-            
+
         Returns:
             bool: True if notification should be throttled, False otherwise
         """
         if notification_key not in self.notification_cache:
             return False
-        
+
         last_sent = self.notification_cache[notification_key]
         return datetime.utcnow() - last_sent < self.throttle_duration
-    
+
     def _update_throttle_cache(self, notification_key: str):
         """
         Update last notification timestamp for throttling
-        
+
         Args:
             notification_key: Unique key for notification type
         """
         self.notification_cache[notification_key] = datetime.utcnow()
-    
+
     def _format_quality_message(self, old: str, new: str, factor: str) -> Tuple[str, str]:
         """
         Format water quality change message        Args:
             old: Previous water quality classification
             new: New water quality classification
             factor: Top contributing factor from SHAP analysis
-            
+
         Returns:
             Tuple[str, str]: (title, body) for notification
         """
@@ -460,14 +471,43 @@ class NotificationService:
             )
         }
         return messages.get(new, ("Water Quality Update", f"Status changed to {new}"))
-    
+
+    async def get_device_owner_tokens(
+        self,
+        device_id: str,
+        db: AsyncIOMotorDatabase,
+    ) -> List[Tuple[str, Dict]]:
+        """Return only the active device owner's token and alert preferences."""
+        association = await db.user_device_associations.find_one(
+            {"device_id": device_id, "is_active": True}
+        )
+        if not association:
+            return []
+        owner_id = str(association["user_id"])
+        owner_queries = [{"_id": owner_id}]
+        if ObjectId.is_valid(owner_id):
+            owner_queries.append({"_id": ObjectId(owner_id)})
+        user = await db.users.find_one({
+            "$and": [{"$or": owner_queries}, {"is_active": True}, {"push_enabled": True}]
+        })
+        if not user:
+            return []
+        preferences = {
+            "alert_on_unsafe": user.get("alert_on_unsafe", True),
+            "alert_on_high_risk": user.get("alert_on_high_risk", True),
+            "alert_on_tank_critical": user.get("alert_on_tank_critical", True),
+            "push_enabled": user.get("push_enabled", True),
+        }
+        token = user.get("fcm_token")
+        return [(token, preferences)] if token else []
+
     async def get_active_user_tokens(self, db: AsyncIOMotorDatabase) -> List[Tuple[str, Dict]]:
         """
         Get FCM tokens and preferences for all active users
-        
+
         Args:
             db: MongoDB database instance
-            
+
         Returns:
             List of tuples (FCM token, preferences dict) for active users
         """
@@ -485,7 +525,7 @@ class NotificationService:
                     "push_enabled": 1
                 }
             )
-            
+
             tokens_with_prefs = []
             async for user in cursor:
                 if user.get("fcm_token"):
@@ -496,20 +536,20 @@ class NotificationService:
                         "push_enabled": user.get("push_enabled", True)
                     }
                     tokens_with_prefs.append((user["fcm_token"], prefs))
-            
+
             logger.debug(f"Found {len(tokens_with_prefs)} active user FCM tokens with preferences")
             return tokens_with_prefs
-            
+
         except Exception as e:
             logger.error(f"Error retrieving user FCM tokens: {str(e)}", exc_info=True)
             return []
-    
+
     def _format_tank_message(self, status: str, level: float) -> Tuple[str, str]:
         """
         Format tank level message        Args:
             status: Tank status (Empty, Half_Full, Full, Overflow)
             level: Tank level percentage
-            
+
         Returns:
             Tuple[str, str]: (title, body) for notification
         """
@@ -541,7 +581,7 @@ notification_service: Optional[NotificationService] = None
 def get_notification_service() -> Optional[NotificationService]:
     """
     Get the global notification service instance
-    
+
     Returns:
         NotificationService instance or None if not initialized
     """
@@ -551,15 +591,15 @@ def get_notification_service() -> Optional[NotificationService]:
 def initialize_notification_service(fcm_server_key: Optional[str]) -> Optional[NotificationService]:
     """
     Initialize the global notification service instance
-    
+
     Args:
         fcm_server_key: Firebase Cloud Messaging server key
-        
+
     Returns:
         NotificationService instance or None if FCM key not provided
     """
     global notification_service
-    
+
     if fcm_server_key:
         notification_service = NotificationService(fcm_server_key)
         logger.info("Notification service initialized successfully")

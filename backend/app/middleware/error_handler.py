@@ -27,11 +27,11 @@ async def global_error_handler(request: Request, call_next):
     3. Handles authentication errors (return 401)
     4. Handles authorization errors (return 403)
     5. Logs all errors with timestamp, component, and context
-    
+
     Args:
         request: FastAPI request object
         call_next: Next middleware or route handler
-        
+
     Returns:
         Response from route handler or error response
     """
@@ -39,7 +39,7 @@ async def global_error_handler(request: Request, call_next):
         # Process the request
         response = await call_next(request)
         return response
-        
+
     except Exception as exc:
         # Handle the exception and return appropriate error response
         return await handle_exception(request, exc)
@@ -48,11 +48,11 @@ async def global_error_handler(request: Request, call_next):
 async def handle_exception(request: Request, exc: Exception) -> JSONResponse:
     """
     Handle exceptions and return appropriate error responses
-    
+
     Args:
         request: FastAPI request object
         exc: Exception that occurred
-        
+
     Returns:
         JSONResponse with error details
     """
@@ -63,7 +63,7 @@ async def handle_exception(request: Request, exc: Exception) -> JSONResponse:
         "client_host": request.client.host if request.client else None,
         "user_agent": request.headers.get("user-agent"),
     }
-    
+
     # Handle database connection errors
     if isinstance(exc, (ServerSelectionTimeoutError, ConnectionFailure)):
         logger.error(
@@ -78,7 +78,7 @@ async def handle_exception(request: Request, exc: Exception) -> JSONResponse:
             },
             exc_info=True
         )
-        
+
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={
@@ -88,7 +88,7 @@ async def handle_exception(request: Request, exc: Exception) -> JSONResponse:
                 "timestamp": datetime.utcnow().isoformat()
             }
         )
-    
+
     # Handle request validation errors
     if isinstance(exc, RequestValidationError):
         # Extract validation error details
@@ -97,13 +97,13 @@ async def handle_exception(request: Request, exc: Exception) -> JSONResponse:
             field = " -> ".join(str(loc) for loc in error["loc"])
             message = error["msg"]
             error_type = error["type"]
-            
+
             errors.append({
                 "field": field,
                 "message": message,
                 "type": error_type
             })
-        
+
         logger.warning(
             f"Request validation error: {len(errors)} validation errors",
             extra={
@@ -116,7 +116,7 @@ async def handle_exception(request: Request, exc: Exception) -> JSONResponse:
                 }
             }
         )
-        
+
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content={
@@ -127,7 +127,7 @@ async def handle_exception(request: Request, exc: Exception) -> JSONResponse:
                 "timestamp": datetime.utcnow().isoformat()
             }
         )
-    
+
     # Handle Pydantic validation errors
     if isinstance(exc, ValidationError):
         errors = []
@@ -135,13 +135,13 @@ async def handle_exception(request: Request, exc: Exception) -> JSONResponse:
             field = " -> ".join(str(loc) for loc in error["loc"])
             message = error["msg"]
             error_type = error["type"]
-            
+
             errors.append({
                 "field": field,
                 "message": message,
                 "type": error_type
             })
-        
+
         logger.warning(
             f"Data validation error: {len(errors)} validation errors",
             extra={
@@ -154,7 +154,7 @@ async def handle_exception(request: Request, exc: Exception) -> JSONResponse:
                 }
             }
         )
-        
+
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content={
@@ -165,7 +165,7 @@ async def handle_exception(request: Request, exc: Exception) -> JSONResponse:
                 "timestamp": datetime.utcnow().isoformat()
             }
         )
-    
+
     # Handle HTTP exceptions
     if isinstance(exc, StarletteHTTPException):
         # Log based on status code
@@ -206,7 +206,7 @@ async def handle_exception(request: Request, exc: Exception) -> JSONResponse:
                     }
                 }
             )
-        
+
         return JSONResponse(
             status_code=exc.status_code,
             content={
@@ -217,7 +217,7 @@ async def handle_exception(request: Request, exc: Exception) -> JSONResponse:
                 "timestamp": datetime.utcnow().isoformat()
             }
         )
-    
+
     # Handle all other exceptions
     logger.error(
         f"Unhandled exception: {type(exc).__name__}: {str(exc)}",
@@ -234,7 +234,7 @@ async def handle_exception(request: Request, exc: Exception) -> JSONResponse:
         },
         exc_info=True
     )
-    
+
     # Return generic 500 error (don't expose internal details)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -250,10 +250,10 @@ async def handle_exception(request: Request, exc: Exception) -> JSONResponse:
 def get_error_code_from_status(status_code: int) -> str:
     """
     Get error code string from HTTP status code
-    
+
     Args:
         status_code: HTTP status code
-        
+
     Returns:
         Error code string
     """
@@ -271,7 +271,7 @@ def get_error_code_from_status(status_code: int) -> str:
         503: "service_unavailable",
         504: "gateway_timeout"
     }
-    
+
     return error_codes.get(status_code, "unknown_error")
 
 

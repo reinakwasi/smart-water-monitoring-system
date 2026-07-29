@@ -8,29 +8,29 @@ from slowapi.errors import RateLimitExceeded
 
 class TestRateLimitingConfiguration:
     """Test rate limiting configuration"""
-    
+
     def test_rate_limit_configuration_loaded(self):
         """
         Test that rate limit configuration is loaded correctly        """
         # Verify rate limit setting is loaded
         assert settings.rate_limit_per_minute == 100
-        
+
         # Verify it's a positive integer
         assert isinstance(settings.rate_limit_per_minute, int)
         assert settings.rate_limit_per_minute > 0
-    
+
     def test_limiter_initialization(self):
         """
         Test that rate limiter is properly initialized
         """
         # Verify limiter exists
         assert limiter is not None
-        
+
         # Verify limiter has correct configuration
         assert limiter._key_func == get_rate_limit_key
         assert limiter._storage_uri == "memory://"
         assert limiter._strategy == "fixed-window"
-    
+
     def test_rate_limit_key_function(self):
         """
         Test that rate limit key function extracts IP address correctly
@@ -39,27 +39,27 @@ class TestRateLimitingConfiguration:
         class MockClient:
             def __init__(self, host):
                 self.host = host
-        
+
         class MockRequest:
             def __init__(self, client_host):
                 self.client = MockClient(client_host)
-        
+
         # Test with different IP addresses
         request1 = MockRequest("192.168.1.1")
         key1 = get_rate_limit_key(request1)
         assert key1 == "192.168.1.1"
-        
+
         request2 = MockRequest("10.0.0.1")
         key2 = get_rate_limit_key(request2)
         assert key2 == "10.0.0.1"
-        
+
         # Verify different IPs get different keys
         assert key1 != key2
 
 
 class TestRateLimitErrorHandler:
     """Test rate limit error handler"""
-    
+
     @pytest.mark.asyncio
     async def test_rate_limit_error_response_format(self):
         """
@@ -68,36 +68,36 @@ class TestRateLimitErrorHandler:
         class MockClient:
             def __init__(self):
                 self.host = "192.168.1.1"
-        
+
         class MockURL:
             def __init__(self):
                 self.path = "/api/v1/sensor/sensor-data"
-        
+
         class MockRequest:
             def __init__(self):
                 self.client = MockClient()
                 self.url = MockURL()
                 self.method = "POST"
-        
+
         # Create a mock limit object that RateLimitExceeded expects
         class MockLimit:
             def __init__(self):
                 self.error_message = "100 per 1 minute"
-        
+
         # Create exception with the mock limit object
         exc = RateLimitExceeded(MockLimit())
-        
+
         # Call the error handler
         request = MockRequest()
         response = await rate_limit_exceeded_handler(request, exc)
-        
+
         # Verify response status code
         assert response.status_code == 429
-        
+
         # Verify response body
         import json
         body = json.loads(response.body.decode())
-        
+
         assert body["status"] == "error"
         assert body["error"] == "rate_limit_exceeded"
         assert "Too many requests" in body["message"]
@@ -107,7 +107,7 @@ class TestRateLimitErrorHandler:
 
 class TestSSLConfiguration:
     """Test SSL/TLS configuration"""
-    
+
     def test_ssl_configuration_defaults(self):
         """
         Test that SSL configuration has correct defaults        """
@@ -115,12 +115,12 @@ class TestSSLConfiguration:
         assert hasattr(settings, "ssl_enabled")
         assert hasattr(settings, "ssl_certfile")
         assert hasattr(settings, "ssl_keyfile")
-        
+
         # Verify defaults (SSL disabled by default for development)
         assert settings.ssl_enabled == False
         assert settings.ssl_certfile is None
         assert settings.ssl_keyfile is None
-    
+
     def test_ssl_configuration_types(self):
         """
         Test that SSL configuration has correct types

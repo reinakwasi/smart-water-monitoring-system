@@ -14,20 +14,20 @@ const onboardingData = [
   {
     id: '1',
     image: require('../assets/onboarding1.png'),
-    title: 'Real-time water\nmonitoring',
-    description: 'Track your water 24/7 with smart sensors measuring pH, Turbidity, TDS and Temperature.',
+    title: 'Live water\nmonitoring',
+    description: 'Track pH, turbidity, TDS, temperature, and tank level from one place.',
   },
   {
     id: '2',
     image: require('../assets/onboarding2.png'),
-    title: 'AI-powered\npredictions',
-    description: 'Our smart system tells you instantly if your water is safe with clear explanations anyone can understand.',
+    title: 'Clear water\ninsights',
+    description: 'See simple explanations that help you understand what the latest readings mean.',
   },
   {
     id: '3',
     image: require('../assets/onboarding3.png'),
-    title: 'Smart tank\nalerts',
-    description: 'Never miss when your tank is empty or overflowing. Get instant notifications wherever you are.',
+    title: 'Tank level\nalerts',
+    description: 'See clear in-app warnings when the latest tank reading is low or indicates an overflow.',
   },
 ];
 
@@ -58,7 +58,7 @@ const OnboardingScreen = ({ onFinish }) => {
   const renderItem = ({ item }) => (
     <View style={{ width, height }}>
       <Image source={item.image} style={{ width, height, position: 'absolute' }} resizeMode="cover" />
-      
+
       <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: height * 0.4, backgroundColor: 'rgba(0,0,0,0.85)' }} />
 
       <View style={{ position: 'absolute', bottom: 200, left: 30, right: 30 }}>
@@ -106,7 +106,7 @@ const OnboardingScreen = ({ onFinish }) => {
 
       <TouchableOpacity className="absolute bottom-12 left-8 right-8 bg-cyan-400 py-4 rounded-full flex-row items-center justify-center" onPress={handleNext}>
         <Text className="text-lg text-white font-bold mr-2">
-          {currentIndex === onboardingData.length - 1 ? 'Get Started' : 'Next'}
+          {currentIndex === onboardingData.length - 1 ? 'Get started' : 'Next'}
         </Text>
         <Text className="text-2xl text-white font-bold">›</Text>
       </TouchableOpacity>

@@ -49,12 +49,20 @@ htmlcov/
 .hypothesis/
 
 # ML Models and Data
-backend/ml/models/
+backend/ml/models/*
 backend/ml/data/
 *.joblib
 *.pkl
 *.h5
 *.model
+# Keep the validated four-sensor production artifacts with the project.
+!backend/ml/models/classifier_v2.0/
+!backend/ml/models/classifier_v2.0/model.joblib
+!backend/ml/models/classifier_v2.0/metadata.json
+!backend/ml/models/risk_predictor_v2.0/
+!backend/ml/models/risk_predictor_v2.0/model.joblib
+!backend/ml/models/risk_predictor_v2.0/metadata.json
+
 
 # Logs
 *.log
@@ -70,3 +78,5 @@ node_modules/
 
 # Kiro AI assistant files (remove before submission)
 .kiro/
+# Local ESP32 private settings
+esp32/**/local_config.h

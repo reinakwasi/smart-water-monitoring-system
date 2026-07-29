@@ -8,24 +8,24 @@ const int NUM_PINS = 6;
 void setup() {
   Serial.begin(115200);
   delay(2000);
-  
+
   Serial.println("\n╔════════════════════════════════════╗");
   Serial.println("║  ESP32 PIN TEST                    ║");
   Serial.println("║  Testing ADC pins                  ║");
   Serial.println("╚════════════════════════════════════╝\n");
-  
+
   analogReadResolution(12);
   analogSetAttenuation(ADC_11db);
-  
+
   Serial.println("Testing pins (nothing should be connected)...\n");
   delay(1000);
-  
+
   bool allGood = true;
-  
+
   for(int i = 0; i < NUM_PINS; i++) {
     int pin = TEST_PINS[i];
     analogSetPinAttenuation(pin, ADC_11db);
-    
+
     // Take 10 readings
     long total = 0;
     for(int j = 0; j < 10; j++) {
@@ -34,14 +34,14 @@ void setup() {
     }
     int avg = total / 10;
     float voltage = avg * (3.3 / 4095.0);
-    
+
     Serial.print(PIN_NAMES[i]);
     Serial.print(": ADC=");
     Serial.print(avg);
     Serial.print(" (");
     Serial.print(voltage, 2);
     Serial.print("V) ");
-    
+
     if(avg == 0) {
       Serial.println("✗ SHORTED");
       allGood = false;
@@ -52,7 +52,7 @@ void setup() {
       allGood = false;
     }
   }
-  
+
   Serial.println("\n════════════════════════════════════");
   if(allGood) {
     Serial.println("✓ ALL PINS WORKING!");

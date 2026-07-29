@@ -5,11 +5,11 @@ import {
   TextInput,
   TouchableOpacity,
   StatusBar,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { authAPI } from '../services/api';
+import { showAppAlert } from '../utils/alertHelper';
 
 const OTPVerificationScreen = ({ route, navigation }) => {
   const { email } = route.params;
@@ -48,35 +48,25 @@ const OTPVerificationScreen = ({ route, navigation }) => {
 
   const handleVerify = async () => {
     const otpCode = otp.join('');
-    
+
     if (otpCode.length !== 6) {
-      Alert.alert('Invalid OTP', 'Please enter the complete 6-digit code');
+      showAppAlert('Invalid code', 'Please enter the complete 6-digit code.', [], 'warning');
       return;
     }
 
     setLoading(true);
-    
+
     try {
       await authAPI.verifyOTP({ email, otp: otpCode });
-      
-      Alert.alert(
-        'Success! 🎉',
-        'Your email has been verified successfully! You can now sign in to your account.',
-        [
-          {
-            text: 'Sign In',
-            onPress: () => navigation.navigate('Login')
-          }
-        ]
-      );
-      
+
+      showAppAlert('Email verified', 'Your email has been verified successfully. You can now sign in to your account.', [{ text: 'Sign in', onPress: () => navigation.navigate('Login') }], 'success');
+
     } catch (error) {
-      console.error('OTP verification error:', error);
-      
+
       if (error.response?.status === 400) {
-        Alert.alert('Verification Failed', 'Invalid or expired OTP code. Please try again or request a new code.');
+        showAppAlert('Verification failed', 'Invalid or expired code. Please try again or request a new code.', [], 'error');
       } else {
-        Alert.alert('Error', 'Failed to verify OTP. Please try again.');
+        showAppAlert('Verification failed', 'Could not verify the code. Please try again.', [], 'error');
       }
     } finally {
       setLoading(false);
@@ -87,18 +77,17 @@ const OTPVerificationScreen = ({ route, navigation }) => {
     if (timer > 0) return;
 
     setResending(true);
-    
+
     try {
       await authAPI.resendOTP({ email });
-      
-      Alert.alert('Success', 'A new OTP code has been sent to your email');
+
+      showAppAlert('Code sent', 'A new verification code has been sent to your email.', [], 'success');
       setTimer(60);
       setOtp(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
-      
+
     } catch (error) {
-      console.error('Resend OTP error:', error);
-      Alert.alert('Error', 'Failed to resend OTP. Please try again.');
+      showAppAlert('Code not sent', 'Could not resend the code. Please try again.', [], 'error');
     } finally {
       setResending(false);
     }
@@ -107,10 +96,10 @@ const OTPVerificationScreen = ({ route, navigation }) => {
   return (
     <View className="flex-1 bg-gray-50">
       <StatusBar barStyle="light-content" backgroundColor="#0891B2" />
-      
+
       <View className="bg-[#0891B2] pt-12 pb-12 px-6 relative overflow-hidden items-center">
         <View className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-white/10" />
-        
+
         <TouchableOpacity className="absolute top-12 left-5 p-2" onPress={() => navigation.goBack()}>
           <MaterialIcons name="arrow-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
@@ -119,7 +108,7 @@ const OTPVerificationScreen = ({ route, navigation }) => {
           <MaterialIcons name="mark-email-read" size={64} color="#FFFFFF" />
         </View>
 
-        <Text className="text-3xl font-bold text-white mb-3 text-center">Verify Your Email</Text>
+        <Text className="text-3xl font-bold text-white mb-3 text-center">Verify your email</Text>
         <Text className="text-sm text-cyan-100 text-center leading-5">
           We've sent a 6-digit code to{'\n'}
           <Text className="font-semibold text-white">{email}</Text>
@@ -127,8 +116,8 @@ const OTPVerificationScreen = ({ route, navigation }) => {
       </View>
 
       <View className="flex-1 bg-white rounded-t-3xl -mt-5 px-6 pt-10">
-        <Text className="text-xs font-semibold text-slate-600 mb-4 tracking-wider text-center">ENTER OTP CODE</Text>
-        
+        <Text className="text-xs font-semibold text-slate-600 mb-4 tracking-wider text-center">ENTER VERIFICATION CODE</Text>
+
         <View className="flex-row justify-between mb-8">
           {otp.map((digit, index) => (
             <TextInput
@@ -147,7 +136,7 @@ const OTPVerificationScreen = ({ route, navigation }) => {
           ))}
         </View>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           className={`rounded-xl h-14 justify-center items-center mb-6 ${loading ? 'bg-slate-400' : 'bg-[#0891B2]'}`}
           onPress={handleVerify}
           disabled={loading}
@@ -155,7 +144,7 @@ const OTPVerificationScreen = ({ route, navigation }) => {
           {loading ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text className="text-white text-base font-semibold">Verify Email</Text>
+            <Text className="text-white text-base font-semibold">Verify email</Text>
           )}
         </TouchableOpacity>
 
@@ -168,7 +157,7 @@ const OTPVerificationScreen = ({ route, navigation }) => {
               {resending ? (
                 <ActivityIndicator size="small" color="#0891B2" />
               ) : (
-                <Text className="text-sm text-[#0891B2] font-semibold">Resend OTP</Text>
+                <Text className="text-sm text-[#0891B2] font-semibold">Resend code</Text>
               )}
             </TouchableOpacity>
           )}

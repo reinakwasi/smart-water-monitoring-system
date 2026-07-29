@@ -1,6 +1,17 @@
 # Water Quality Monitoring System - Backend
 
-Backend API for water quality monitoring with ML predictions.
+Backend API for the AquaGuard ESP32 water-quality monitoring prototype.
+
+## Active Project Scope
+
+- Physical probes: pH, turbidity index, temperature, and TDS
+- Separate ultrasonic tank-level measurement
+- Random Forest quality classification and temporal risk prediction (model v2.0)
+- Shared AquaGuard operational bands for consistent labels across the API and app
+- Device API-key authentication plus user JWT access and refresh tokens
+
+Dissolved oxygen is not part of the active hardware or model input. Some older
+file and test identifiers are retained only for backward compatibility.
 
 ## Setup
 

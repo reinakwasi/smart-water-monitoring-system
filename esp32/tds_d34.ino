@@ -15,7 +15,7 @@ void loop() {
   int adc = analogRead(TDS_PIN);
   float voltage = adc * (3.3 / 4095.0);
   float tds = voltage * 133.42;
-  
+
   // Display
   Serial.print("ADC: ");
   Serial.print(adc);
@@ -24,7 +24,7 @@ void loop() {
   Serial.print("V | TDS: ");
   Serial.print(tds, 0);
   Serial.print(" ppm");
-  
+
   // Status
   if(adc < 100) {
     Serial.println(" | ⚠ Too low");
@@ -33,6 +33,6 @@ void loop() {
   } else {
     Serial.println(" | ✓ Reading");
   }
-  
+
   delay(500);
 }

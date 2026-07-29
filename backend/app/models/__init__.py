@@ -6,13 +6,13 @@ from app.models.schemas import (
     RiskLevel,
     TankStatus,
     UserRole,
-    
+
     # Request models
     SensorDataRequest,
     TankLevelRequest,
     UserRegisterRequest,
     UserLoginRequest,
-    
+
     # Response models
     SensorDataResponse,
     TankLevelResponse,
@@ -42,13 +42,13 @@ __all__ = [
     "RiskLevel",
     "TankStatus",
     "UserRole",
-    
+
     # Request models
     "SensorDataRequest",
     "TankLevelRequest",
     "UserRegisterRequest",
     "UserLoginRequest",
-    
+
     # Response models
     "SensorDataResponse",
     "TankLevelResponse",
@@ -61,7 +61,7 @@ __all__ = [
     "TokenResponse",
     "UserResponse",
     "ErrorResponse",
-    
+
     # Database models
     "SensorReadingDocument",
     "TankReadingDocument",

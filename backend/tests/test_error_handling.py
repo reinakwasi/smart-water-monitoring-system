@@ -17,22 +17,22 @@ async def test_validation_error_handling(async_client: AsyncClient):
             # Missing required fields: password, full_name
         }
     )
-    
+
     assert response.status_code == 422
-    
+
     data = response.json()
-    
+
     # Verify error response structure
     assert data["status"] == "error"
     assert data["error"] == "validation_error"
     assert "message" in data
     assert "detail" in data  # Changed from "details" to "detail"
     assert "timestamp" in data
-    
+
     # Verify detail contain field-level errors
     assert isinstance(data["detail"], list)
     assert len(data["detail"]) > 0
-    
+
     # Each error should have field, message, and type
     for error in data["detail"]:
         assert "field" in error
@@ -53,9 +53,9 @@ async def test_validation_error_invalid_types(async_client: AsyncClient):
             "full_name": "Test User"
         }
     )
-    
+
     assert response.status_code == 422
-    
+
     data = response.json()
     assert data["status"] == "error"
     assert data["error"] == "validation_error"
@@ -68,11 +68,11 @@ async def test_authentication_error_handling(async_client: AsyncClient):
     Test authentication errors return 401    """
     # Try to access protected endpoint without authentication
     response = await async_client.get("/api/v1/status/current-status")
-    
+
     assert response.status_code == 401
-    
+
     data = response.json()
-    
+
     # Verify error response structure
     assert data["status"] == "error"
     assert data["error"] == "unauthorized"
@@ -89,9 +89,9 @@ async def test_authentication_error_invalid_token(async_client: AsyncClient):
         "/api/v1/status/current-status",
         headers={"Authorization": "Bearer invalid_token_12345"}
     )
-    
+
     assert response.status_code == 401
-    
+
     data = response.json()
     assert data["status"] == "error"
     assert data["error"] == "unauthorized"
@@ -102,20 +102,20 @@ async def test_authorization_error_handling(async_client: AsyncClient, test_user
     """
     Test authorization errors return 403    """
     from app.services.auth_service import auth_service
-    
+
     # Create a valid token for a regular user
     user_token = auth_service.create_access_token({"sub": test_user["email"], "role": test_user["role"]})
-    
+
     # Try to access admin-only endpoint with regular user token
     response = await async_client.get(
         "/api/v1/config",
         headers={"Authorization": f"Bearer {user_token}"}
     )
-    
+
     assert response.status_code == 403
-    
+
     data = response.json()
-    
+
     # Verify error response structure
     assert data["status"] == "error"
     assert data["error"] == "forbidden"
@@ -129,11 +129,11 @@ async def test_not_found_error_handling(async_client: AsyncClient):
     Test 404 errors are handled properly    """
     # Try to access non-existent endpoint
     response = await async_client.get("/api/v1/nonexistent-endpoint")
-    
+
     assert response.status_code == 404
-    
+
     data = response.json()
-    
+
     # Verify error response structure
     assert data["status"] == "error"
     assert data["error"] == "not_found"
@@ -150,11 +150,11 @@ async def test_error_response_timestamp_format(async_client: AsyncClient):
         "/api/v1/auth/register",
         json={"email": "test@example.com"}  # Missing required fields
     )
-    
+
     assert response.status_code == 422
-    
+
     data = response.json()
-    
+
     # Verify timestamp is valid ISO8601 format
     assert "timestamp" in data
     timestamp = datetime.fromisoformat(data["timestamp"].replace("Z", "+00:00"))
@@ -165,7 +165,7 @@ async def test_error_response_timestamp_format(async_client: AsyncClient):
 async def test_error_response_consistency(async_client: AsyncClient):
     """
     Test all error responses follow consistent format
-    
+
     Requirement 16.7, 16.8: Consistent error handling and logging
     """
     # Test multiple error scenarios
@@ -190,24 +190,24 @@ async def test_error_response_consistency(async_client: AsyncClient):
             "expected_status": 404
         }
     ]
-    
+
     for scenario in error_scenarios:
         if scenario["method"] == "get":
             response = await async_client.get(scenario["url"])
         elif scenario["method"] == "post":
             response = await async_client.post(scenario["url"], json=scenario.get("json", {}))
-        
+
         assert response.status_code == scenario["expected_status"]
-        
+
         data = response.json()
-        
+
         # All error responses should have consistent structure
         assert "status" in data
         assert data["status"] == "error"
         assert "error" in data
         assert "message" in data
         assert "timestamp" in data
-        
+
         # Timestamp should be valid
         timestamp = datetime.fromisoformat(data["timestamp"].replace("Z", "+00:00"))
         assert isinstance(timestamp, datetime)

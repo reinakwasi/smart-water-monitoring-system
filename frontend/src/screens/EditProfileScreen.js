@@ -5,7 +5,6 @@ import {
   TextInput,
   TouchableOpacity,
   StatusBar,
-  Alert,
   ActivityIndicator,
   ScrollView,
   Image,
@@ -16,7 +15,9 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { useTheme } from '../context/ThemeContext';
-import { authAPI } from '../services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { authAPI, USER_PROFILE_KEY } from '../services/api';
+import { showAppAlert } from '../utils/alertHelper';
 
 const EditProfileScreen = ({ navigation }) => {
   const { theme } = useTheme();
@@ -35,14 +36,28 @@ const EditProfileScreen = ({ navigation }) => {
   const loadUserData = async () => {
     try {
       const profile = await authAPI.getProfile();
-      
+
       setFullName(profile.full_name || '');
       setEmail(profile.email || '');
       setPhoneNumber(profile.phone || '');
       setLocation(profile.location || '');
       setProfileImage(profile.profile_picture || null);
     } catch (error) {
-      Alert.alert('Error', 'Failed to load profile data. Please try again.');
+      try {
+        const cachedProfile = await AsyncStorage.getItem(USER_PROFILE_KEY);
+        if (cachedProfile) {
+          const profile = JSON.parse(cachedProfile);
+          setFullName(profile.full_name || '');
+          setEmail(profile.email || '');
+          setPhoneNumber(profile.phone || '');
+          setLocation(profile.location || '');
+          setProfileImage(profile.profile_picture || null);
+        } else {
+          showAppAlert('Profile unavailable', 'AquaGuard could not load your profile. Check your connection and try again.', [], 'error');
+        }
+      } catch (cacheError) {
+        showAppAlert('Profile unavailable', 'AquaGuard could not load your profile. Check your connection and try again.', [], 'error');
+      }
     } finally {
       setInitialLoading(false);
     }
@@ -54,8 +69,8 @@ const EditProfileScreen = ({ navigation }) => {
     if (names.length === 0) return 'U';
     if (names.length === 1) {
       const firstName = names[0];
-      return firstName.length >= 2 
-        ? firstName.substring(0, 2).toUpperCase() 
+      return firstName.length >= 2
+        ? firstName.substring(0, 2).toUpperCase()
         : firstName.charAt(0).toUpperCase();
     }
     return (names[0][0] + names[names.length - 1][0]).toUpperCase();
@@ -67,8 +82,8 @@ const EditProfileScreen = ({ navigation }) => {
         const granted = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.CAMERA,
           {
-            title: 'Camera Permission',
-            message: 'AquaGuard needs access to your camera to take profile photos',
+            title: 'Camera access',
+            message: 'Allow camera access to take a profile photo.',
             buttonNeutral: 'Ask Me Later',
             buttonNegative: 'Cancel',
             buttonPositive: 'OK',
@@ -83,33 +98,47 @@ const EditProfileScreen = ({ navigation }) => {
     return true;
   };
 
+  const requestGalleryPermission = async () => {
+    if (Platform.OS !== 'android') return true;
+
+    const permission = Platform.Version >= 33
+      ? PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES
+      : PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE;
+
+    if (!permission) return true;
+
+    try {
+      const granted = await PermissionsAndroid.request(permission, {
+        title: 'Photo access',
+        message: 'Allow photo access to choose a profile picture.',
+        buttonNegative: 'Cancel',
+        buttonPositive: 'OK',
+      });
+      return granted === PermissionsAndroid.RESULTS.GRANTED;
+    } catch (err) {
+      console.warn(err);
+      return false;
+    }
+  };
+
   const handleImagePicker = () => {
-    Alert.alert(
-      'Profile Photo',
-      'Choose an option',
+    showAppAlert(
+      'Profile photo',
+      'Choose how you want to update your account photo.',
       [
-        {
-          text: 'Take Photo',
-          onPress: handleTakePhoto,
-        },
-        {
-          text: 'Choose from Gallery',
-          onPress: handleChooseFromGallery,
-        },
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
+        { text: 'Take photo', onPress: handleTakePhoto },
+        { text: 'Choose from gallery', onPress: handleChooseFromGallery },
+        { text: 'Cancel', style: 'cancel' },
       ],
-      { cancelable: true }
+      'info',
     );
   };
 
   const handleTakePhoto = async () => {
     const hasPermission = await requestCameraPermission();
-    
+
     if (!hasPermission) {
-      Alert.alert('Permission Denied', 'Camera permission is required to take photos');
+      showAppAlert('Camera permission needed', 'Allow camera access before taking a profile photo.', [], 'warning');
       return;
     }
 
@@ -128,7 +157,7 @@ const EditProfileScreen = ({ navigation }) => {
       }
 
       if (response.errorCode) {
-        Alert.alert('Error', 'Failed to take photo. Please try again.');
+        showAppAlert('Photo not captured', 'The camera could not take the photo. Please try again.', [], 'error');
         return;
       }
 
@@ -139,13 +168,21 @@ const EditProfileScreen = ({ navigation }) => {
     });
   };
 
-  const handleChooseFromGallery = () => {
+  const handleChooseFromGallery = async () => {
+    const hasPermission = await requestGalleryPermission();
+
+    if (!hasPermission) {
+      showAppAlert('Photo permission needed', 'Allow photo access before choosing a profile picture from your device.', [], 'warning');
+      return;
+    }
+
     const options = {
       mediaType: 'photo',
       quality: 0.8,
       maxWidth: 500,
       maxHeight: 500,
       includeBase64: true,
+      selectionLimit: 1,
     };
 
     launchImageLibrary(options, (response) => {
@@ -154,7 +191,7 @@ const EditProfileScreen = ({ navigation }) => {
       }
 
       if (response.errorCode) {
-        Alert.alert('Error', 'Failed to select photo. Please try again.');
+        showAppAlert('Photo not selected', 'AquaGuard could not load that photo. Please try again.', [], 'error');
         return;
       }
 
@@ -167,12 +204,12 @@ const EditProfileScreen = ({ navigation }) => {
 
   const handleSaveChanges = async () => {
     if (!fullName.trim()) {
-      Alert.alert('Validation Error', 'Please enter your full name');
+      showAppAlert('Name required', 'Please enter your full name.', [], 'warning');
       return;
     }
 
     if (fullName.trim().length < 3) {
-      Alert.alert('Validation Error', 'Full name must be at least 3 characters');
+      showAppAlert('Name too short', 'Full name must be at least 3 characters.', [], 'warning');
       return;
     }
 
@@ -186,14 +223,11 @@ const EditProfileScreen = ({ navigation }) => {
         profile_picture: profileImage || null,
       });
 
-      Alert.alert('Success', 'Profile updated successfully', [
-        {
-          text: 'OK',
-          onPress: () => navigation.goBack(),
-        },
-      ]);
+      showAppAlert('Profile updated', 'Your account details have been saved successfully.', [
+        { text: 'Done', onPress: () => navigation.goBack() },
+      ], 'success');
     } catch (error) {
-      Alert.alert('Error', 'Failed to update profile. Please try again.');
+      showAppAlert('Profile not saved', error.response?.data?.detail || 'AquaGuard could not update your profile. Please try again.', [], 'error');
     } finally {
       setLoading(false);
     }
@@ -217,26 +251,26 @@ const EditProfileScreen = ({ navigation }) => {
 
       <View className="bg-[#0B7FA5] pt-12 pb-12 px-6 relative overflow-hidden">
         <View className="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-white/10" />
-        
+
         <TouchableOpacity className="flex-row items-center mb-8" onPress={handleCancel}>
           <MaterialIcons name="arrow-back" size={24} color="#FFFFFF" />
           <Text className="text-white text-base ml-2 font-medium">Back</Text>
         </TouchableOpacity>
 
-        <Text className="text-4xl font-bold text-white mb-2">Edit Profile</Text>
+        <Text className="text-4xl font-bold text-white mb-2">Edit profile</Text>
         <Text className="text-base text-cyan-100">Update your account details</Text>
       </View>
 
       <ScrollView className="flex-1 rounded-t-3xl -mt-5 px-6 pt-8" style={{ backgroundColor: theme.colors.background }} showsVerticalScrollIndicator={false} bounces={false}>
         <View className="items-center mb-8">
-          <TouchableOpacity 
+          <TouchableOpacity
             className="w-24 h-24 rounded-full bg-[#0B7FA5] justify-center items-center relative"
             onPress={handleImagePicker}
             activeOpacity={0.8}
           >
             {profileImage ? (
-              <Image 
-                source={{ uri: profileImage }} 
+              <Image
+                source={{ uri: profileImage }}
                 className="w-24 h-24 rounded-full"
                 resizeMode="cover"
               />
@@ -247,9 +281,29 @@ const EditProfileScreen = ({ navigation }) => {
               <MaterialIcons name="photo-camera" size={16} color="#0B7FA5" />
             </View>
           </TouchableOpacity>
-          <Text className="text-xs mt-2" style={{ color: theme.colors.textTertiary }}>
-            Tap to change photo
+          <Text className="text-xs mt-2 mb-3" style={{ color: theme.colors.textTertiary }}>
+            Choose a profile photo
           </Text>
+          <View className="flex-row">
+            <TouchableOpacity
+              className="flex-row items-center px-4 py-2 rounded-xl bg-cyan-50 border border-cyan-100 mr-2"
+              onPress={handleChooseFromGallery}
+              disabled={loading}
+              activeOpacity={0.85}
+            >
+              <MaterialIcons name="photo-library" size={18} color="#0B7FA5" />
+              <Text className="text-sm font-bold ml-2 text-[#0B7FA5]">Choose from device</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="flex-row items-center px-4 py-2 rounded-xl bg-slate-50 border border-slate-200"
+              onPress={handleTakePhoto}
+              disabled={loading}
+              activeOpacity={0.85}
+            >
+              <MaterialIcons name="photo-camera" size={18} color="#64748B" />
+              <Text className="text-sm font-bold ml-2 text-slate-600">Camera</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View className="mb-5">
@@ -328,7 +382,7 @@ const EditProfileScreen = ({ navigation }) => {
           </View>
         </View>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           className={`rounded-xl h-14 justify-center items-center mb-4 ${loading ? 'bg-slate-400' : 'bg-[#0B7FA5]'}`}
           onPress={handleSaveChanges}
           disabled={loading}
@@ -336,11 +390,11 @@ const EditProfileScreen = ({ navigation }) => {
           {loading ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text className="text-white text-base font-semibold">Save Changes</Text>
+            <Text className="text-white text-base font-semibold">Save changes</Text>
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           className="rounded-xl h-14 justify-center items-center mb-8 border"
           style={{ borderColor: theme.colors.border }}
           onPress={handleCancel}

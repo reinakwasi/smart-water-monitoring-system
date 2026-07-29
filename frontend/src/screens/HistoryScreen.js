@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   View,
   Text,
   ScrollView,
@@ -7,16 +8,12 @@ import {
   TouchableOpacity,
   RefreshControl,
   Dimensions,
-  Alert,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
 import { LineChart } from 'react-native-chart-kit';
 import { useTheme } from '../context/ThemeContext';
-import { TOKEN_KEY } from '../services/api';
+import { historicalDataAPI } from '../services/api';
 
-const API_BASE_URL = 'http://172.20.10.5:8080/api/v1';
 const screenWidth = Dimensions.get('window').width;
 
 const HistoryScreen = ({ navigation }) => {
@@ -26,65 +23,53 @@ const HistoryScreen = ({ navigation }) => {
   const [showTimeRangeMenu, setShowTimeRangeMenu] = useState(false);
   const [historyData, setHistoryData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  useEffect(() => {
-    fetchHistoryData();
-  }, [timeRange]);
-
-  const fetchHistoryData = async () => {
+  const fetchHistoryData = useCallback(async () => {
     try {
-      const token = await AsyncStorage.getItem(TOKEN_KEY);
-      
-      if (!token) {
-        return;
-      }
+      setLoading(true);
+      const endDate = new Date();
+      const startDate = new Date(endDate);
+      if (timeRange === '7D') startDate.setDate(endDate.getDate() - 7);
+      else if (timeRange === '30D') startDate.setDate(endDate.getDate() - 30);
+      else startDate.setFullYear(endDate.getFullYear() - 1);
 
-      const response = await axios.get(`${API_BASE_URL}/status/current-status`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        timeout: 10000
+      const response = await historicalDataAPI.getHistoricalData({
+        start_date: startDate.toISOString(),
+        end_date: endDate.toISOString(),
+        parameter: 'all',
+        limit: 1000,
       });
+      const readings = (response.data || []).map(point => {
+        const riskScore = Number(point.risk_score);
+        const risk = Number.isFinite(riskScore)
+          ? (riskScore >= 0.7 ? 'High risk' : riskScore >= 0.4 ? 'Medium risk' : 'Low risk')
+          : 'Risk unavailable';
+        return {
+          timestamp: new Date(point.timestamp),
+          ph: Number(point.parameters?.ph),
+          turbidity: Number(point.parameters?.turbidity_index),
+          temperature: Number(point.parameters?.temperature),
+          tds: Number(point.parameters?.tds),
+          classification: point.classification || 'Pending',
+          risk,
+          riskScore: Number.isFinite(riskScore) ? riskScore : null,
+        };
+      }).filter(reading => [reading.ph, reading.turbidity, reading.temperature, reading.tds].every(Number.isFinite));
 
-      const data = response.data;
-      
-      const mockHistory = generateMockHistory(data);
-      setHistoryData(mockHistory);
-      
-    } catch (error) {
+      setHistoryData(readings.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()));
+      setError(null);
+    } catch (requestError) {
       setHistoryData([]);
+      setError('Past readings could not be loaded. Pull down to try again.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [timeRange]);
 
-  const generateMockHistory = (currentData) => {
-    const history = [];
-    const now = new Date();
-    
-    let days = 7;
-    if (timeRange === '30D') days = 30;
-    if (timeRange === 'All') days = 90;
-    
-    for (let i = 0; i < days; i++) {
-      const date = new Date(now);
-      date.setDate(date.getDate() - i);
-      
-      const variance = () => (Math.random() - 0.5) * 0.3;
-      
-      history.push({
-        timestamp: date,
-        ph: Math.max(6.5, Math.min(8.5, (currentData.water_quality.parameters.ph || 7.2) + variance())),
-        turbidity: Math.max(0, Math.min(50, (currentData.water_quality.parameters.turbidity_index ?? 3.1) + variance() * 10)),
-        tds: Math.max(0, Math.min(500, (currentData.water_quality.parameters.tds || 312) + variance() * 50)),
-        temperature: Math.max(20, Math.min(30, (currentData.water_quality.parameters.temperature || 24) + variance() * 3)),
-        classification: i === 0 ? 'Not safe' : i === 2 ? 'Caution' : 'Safe',
-        risk: i === 0 ? 'Medium risk' : i === 2 ? 'Medium risk' : 'Low risk',
-      });
-    }
-    
-    return history;
-  };
+  useEffect(() => {
+    fetchHistoryData();
+  }, [fetchHistoryData]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -121,10 +106,10 @@ const HistoryScreen = ({ navigation }) => {
   const getCurrentValue = (parameter) => {
     if (historyData.length === 0) return '0';
     const value = historyData[0][parameter];
-    
+
     switch (parameter) {
       case 'ph': return `${value.toFixed(1)} today`;
-      case 'turbidity': return `${value.toFixed(1)} /100 today`;
+      case 'turbidity': return `${value.toFixed(1)} NTU today`;
       case 'tds': return `${Math.round(value)} ppm today`;
       case 'temperature': return `${Math.round(value)}°C today`;
       default: return `${value}`;
@@ -153,7 +138,7 @@ const HistoryScreen = ({ navigation }) => {
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
-    
+
     if (date.toDateString() === today.toDateString()) {
       return 'Today';
     } else if (date.toDateString() === yesterday.toDateString()) {
@@ -166,20 +151,23 @@ const HistoryScreen = ({ navigation }) => {
 
   const getStatusColor = (classification) => {
     if (classification === 'Safe') return 'text-green-600';
-    if (classification === 'Caution') return 'text-orange-500';
+    if (classification === 'Warning') return 'text-orange-500';
+    if (classification === 'Pending') return 'text-slate-500';
     return 'text-red-600';
   };
 
   const getRiskColor = (risk) => {
-    if (risk === 'Low risk') return 'text-slate-500';
-    return 'text-slate-600';
+    if (risk === 'Low risk') return 'text-green-600';
+    if (risk === 'Medium risk') return 'text-amber-600';
+    if (risk === 'High risk') return 'text-red-600';
+    return 'text-slate-500';
   };
 
   const getTimeRangeLabel = () => {
     switch (timeRange) {
       case '7D': return 'Last 7 days';
       case '30D': return 'Last 30 days';
-      case 'All': return 'All time';
+      case 'All': return 'Last 12 months';
       default: return 'Last 7 days';
     }
   };
@@ -190,14 +178,27 @@ const HistoryScreen = ({ navigation }) => {
   };
 
   const handleDownloadReport = () => {
-    Alert.alert('Download Report', 'Report download feature coming soon. You will be able to download your water quality data as PDF or CSV.');
+    navigation.navigate('ExportData');
   };
+
+  const latestReading = historyData[0] || null;
+  const warningCount = historyData.filter(item => ['Warning', 'Unsafe'].includes(item.classification)).length;
+  const highRiskCount = historyData.filter(item => item.risk === 'High risk').length;
+  const latestReadingLabel = latestReading ? latestReading.classification + ' - ' + latestReading.risk : 'No reading yet';
+
+  const renderSummaryTile = ({ icon, label, value, color, background }) => (
+    <View className="w-[48%] rounded-2xl p-4 mb-3" style={{ backgroundColor: background }}>
+      <MaterialIcons name={icon} size={22} color={color} />
+      <Text className="text-xs mt-3" style={{ color: theme.colors.textSecondary }}>{label}</Text>
+      <Text className="text-lg font-bold mt-1" style={{ color: theme.colors.text }}>{value}</Text>
+    </View>
+  );
 
   return (
     <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
       <StatusBar barStyle={theme.colors.statusBar} backgroundColor={theme.colors.statusBarBg} />
-      
-      <ScrollView 
+
+      <ScrollView
         showsVerticalScrollIndicator={false}
         bounces={false}
         contentContainerStyle={{ flexGrow: 1 }}
@@ -211,7 +212,7 @@ const HistoryScreen = ({ navigation }) => {
             <Text className="text-2xl font-bold" style={{ color: theme.colors.text }}>Past Readings</Text>
             <Text className="text-sm" style={{ color: theme.colors.textTertiary }}>{getTimeRangeLabel()}</Text>
           </View>
-          <TouchableOpacity 
+          <TouchableOpacity
             className="bg-cyan-100 px-3 py-1.5 rounded-lg"
             onPress={() => setShowTimeRangeMenu(!showTimeRangeMenu)}
           >
@@ -222,7 +223,7 @@ const HistoryScreen = ({ navigation }) => {
         {/* Time Range Dropdown Menu */}
         {showTimeRangeMenu && (
           <View className="mx-5 mb-4 rounded-2xl shadow-lg" style={{ backgroundColor: theme.colors.cardBackground }}>
-            <TouchableOpacity 
+            <TouchableOpacity
               className="flex-row justify-between items-center px-4 py-3 border-b"
               style={{ borderBottomColor: theme.colors.border }}
               onPress={() => handleTimeRangeSelect('7D')}
@@ -230,7 +231,7 @@ const HistoryScreen = ({ navigation }) => {
               <Text className="text-base" style={{ color: theme.colors.text }}>Last 7 days</Text>
               {timeRange === '7D' && <MaterialIcons name="check" size={20} color="#0891B2" />}
             </TouchableOpacity>
-            <TouchableOpacity 
+            <TouchableOpacity
               className="flex-row justify-between items-center px-4 py-3 border-b"
               style={{ borderBottomColor: theme.colors.border }}
               onPress={() => handleTimeRangeSelect('30D')}
@@ -238,20 +239,56 @@ const HistoryScreen = ({ navigation }) => {
               <Text className="text-base" style={{ color: theme.colors.text }}>Last 30 days</Text>
               {timeRange === '30D' && <MaterialIcons name="check" size={20} color="#0891B2" />}
             </TouchableOpacity>
-            <TouchableOpacity 
+            <TouchableOpacity
               className="flex-row justify-between items-center px-4 py-3"
               onPress={() => handleTimeRangeSelect('All')}
             >
-              <Text className="text-base" style={{ color: theme.colors.text }}>All time</Text>
+              <Text className="text-base" style={{ color: theme.colors.text }}>Last 12 months</Text>
               {timeRange === 'All' && <MaterialIcons name="check" size={20} color="#0891B2" />}
             </TouchableOpacity>
           </View>
         )}
 
         {/* pH Level Trend */}
+        {loading ? (
+          <View className="items-center py-24">
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <Text className="text-sm mt-3" style={{ color: theme.colors.textSecondary }}>Loading stored readings…</Text>
+          </View>
+        ) : error ? (
+          <View className="mx-5 rounded-2xl p-5 mb-5 border border-red-200 bg-red-50">
+            <Text className="text-sm leading-5 text-red-800">{error}</Text>
+            <TouchableOpacity onPress={fetchHistoryData} className="mt-3 self-start">
+              <Text className="text-sm font-bold" style={{ color: theme.colors.primary }}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : historyData.length === 0 ? (
+          <View className="items-center px-8 py-20">
+            <MaterialIcons name="show-chart" size={48} color={theme.colors.textTertiary} />
+            <Text className="text-lg font-bold mt-4" style={{ color: theme.colors.text }}>No stored readings</Text>
+            <Text className="text-sm text-center mt-2" style={{ color: theme.colors.textSecondary }}>No sensor data was recorded during this time range.</Text>
+          </View>
+        ) : (
+          <>
+        <View className="px-5 mb-4">
+          <View className="rounded-2xl p-5 border" style={{ backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }}>
+            <Text className="text-xs font-semibold tracking-wider mb-1" style={{ color: theme.colors.textTertiary }}>HISTORY SUMMARY</Text>
+            <Text className="text-lg font-bold" style={{ color: theme.colors.text }}>Stored water checks</Text>
+            <Text className="text-sm leading-5 mt-1" style={{ color: theme.colors.textSecondary }}>
+              This page keeps past pH, turbidity, temperature, and TDS readings for review after each water check.
+            </Text>
+            <View className="flex-row flex-wrap justify-between mt-4">
+              {renderSummaryTile({ icon: 'fact-check', label: 'Readings saved', value: historyData.length, color: '#0891B2', background: theme.isDarkMode ? '#164E63' : '#ECFEFF' })}
+              {renderSummaryTile({ icon: 'verified-user', label: 'Latest result', value: latestReadingLabel, color: latestReading?.classification === 'Unsafe' ? '#DC2626' : latestReading?.classification === 'Warning' ? '#D97706' : '#059669', background: theme.isDarkMode ? '#1E293B' : '#F8FAFC' })}
+              {renderSummaryTile({ icon: 'warning-amber', label: 'Warnings found', value: warningCount, color: warningCount > 0 ? '#D97706' : '#059669', background: warningCount > 0 ? (theme.isDarkMode ? '#451A03' : '#FFFBEB') : (theme.isDarkMode ? '#052E16' : '#ECFDF5') })}
+              {renderSummaryTile({ icon: 'shield', label: 'High-risk results', value: highRiskCount, color: highRiskCount > 0 ? '#DC2626' : '#059669', background: highRiskCount > 0 ? (theme.isDarkMode ? '#451A1A' : '#FEF2F2') : (theme.isDarkMode ? '#052E16' : '#ECFDF5') })}
+            </View>
+          </View>
+        </View>
+
         <View className="mx-5 rounded-2xl p-4 mb-4 shadow-sm" style={{ backgroundColor: theme.colors.cardBackground }}>
           <View className="flex-row justify-between items-center mb-3">
-            <Text className="text-base font-bold" style={{ color: theme.colors.text }}>pH Level trend</Text>
+            <Text className="text-base font-bold" style={{ color: theme.colors.text }}>pH trend</Text>
             <Text className={`text-base font-bold ${getValueColor('ph')}`}>
               {getCurrentValue('ph')}
             </Text>
@@ -443,10 +480,10 @@ const HistoryScreen = ({ navigation }) => {
         {/* Check History Section */}
         <View className="px-5 mb-4">
           <Text className="text-xs font-semibold tracking-wider mb-4" style={{ color: theme.colors.textTertiary }}>CHECK HISTORY</Text>
-          
+
           <View className="rounded-2xl p-4 shadow-sm" style={{ backgroundColor: theme.colors.cardBackground }}>
             {historyData.slice(0, 4).map((item, index) => (
-              <View 
+              <View
                 key={index}
                 className={`flex-row justify-between items-center py-3`}
                 style={{ borderBottomWidth: index < 3 ? 1 : 0, borderBottomColor: theme.colors.border }}
@@ -466,15 +503,17 @@ const HistoryScreen = ({ navigation }) => {
             ))}
           </View>
         </View>
+          </>
+        )}
 
         {/* Download Report Button */}
         <View className="px-5 mb-8">
-          <TouchableOpacity 
+          <TouchableOpacity
             className="bg-[#0891B2] rounded-2xl py-4 flex-row justify-center items-center"
             onPress={handleDownloadReport}
           >
             <MaterialIcons name="file-download" size={20} color="#FFFFFF" />
-            <Text className="text-white text-base font-bold ml-2">Download Report (PDF / CSV)</Text>
+            <Text className="text-white text-base font-bold ml-2">Open Data Export</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

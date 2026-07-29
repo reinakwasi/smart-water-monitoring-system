@@ -15,6 +15,15 @@ export const showAlert = (type, title, message, buttons = []) => {
   }
 };
 
+export const showAppAlert = (title, message, buttons = [], type = 'info') => {
+  if (typeof buttons === 'string') {
+    showAlert(buttons, title, message, []);
+    return;
+  }
+
+  showAlert(type, title, message, buttons);
+};
+
 // Convenience methods
 export const showSuccess = (title, message, buttons = []) => {
   showAlert('success', title, message, buttons);

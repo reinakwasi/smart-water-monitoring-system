@@ -125,7 +125,7 @@ Po (signal) → A2 (ADS1115)
 
 ```
 Power Rails        Main Area
-  + - 
+  + -
   │ │              [ESP32 here]
   │ │
   │ │              [ADS1115 here]

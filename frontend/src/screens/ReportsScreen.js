@@ -1,344 +1,229 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
+  ActivityIndicator,
+  RefreshControl,
   ScrollView,
   StatusBar,
-  RefreshControl,
+  Text,
   TouchableOpacity,
+  View,
 } from 'react-native';
-import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
-import { TOKEN_KEY } from '../services/api';
+import { statusAPI } from '../services/api';
+import { formatTimeSinceUpdate, getStatusErrorMessage } from '../utils/homeStatus';
+import { buildWaterInsights } from '../utils/waterInsights';
 
-const API_BASE_URL = 'http://172.20.10.5:8080/api/v1';
+const EMPTY_INSIGHTS = buildWaterInsights();
 
-const ReportsScreen = ({ navigation }) => {
+const ReportsScreen = () => {
   const { theme } = useTheme();
+  const [insights, setInsights] = useState(EMPTY_INSIGHTS);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [lastCheck, setLastCheck] = useState('');
-  
-  const [analysis, setAnalysis] = useState({
-    waterSafety: {
-      status: 'Not safe to drink',
-      level: 'Critical',
-      confidence: 0,
-    },
-    contaminationRisk: {
-      risk: 'Medium risk',
-      level: 'Warning',
-      confidence: 0,
-    },
-    factors: {
-      turbidity: { value: 0, level: 'Very high' },
-      ph: { value: 0, level: 'Moderate' },
-      tds: { value: 0, level: 'Low' },
-      temperature: { value: 0, level: 'Very low' },
-    },
-    topFactor: {
-      name: 'Turbidity',
-      shapValue: 0.412,
-    },
-    explanation: '',
-  });
+  const [error, setError] = useState(null);
 
-  useEffect(() => {
-    updateLastCheck();
-    fetchAIAnalysis();
-    const interval = setInterval(fetchAIAnalysis, 30000);
-    return () => clearInterval(interval);
+  const fetchInsights = useCallback(async () => {
+    try {
+      const payload = await statusAPI.getCurrentStatus();
+      setInsights(buildWaterInsights(payload));
+      setError(null);
+    } catch (requestError) {
+      setError(getStatusErrorMessage(requestError));
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const updateLastCheck = () => {
-    const now = new Date();
-    const hours = now.getHours();
-    const minutes = now.getMinutes();
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    const displayHours = hours % 12 || 12;
-    const displayMinutes = minutes < 10 ? `0${minutes}` : minutes;
-    setLastCheck(`${displayHours}:${displayMinutes} ${ampm}`);
-  };
+  useEffect(() => {
+    fetchInsights();
+    const interval = setInterval(fetchInsights, 30000);
+    return () => clearInterval(interval);
+  }, [fetchInsights]);
 
-  const fetchAIAnalysis = async () => {
-    try {
-      const token = await AsyncStorage.getItem(TOKEN_KEY);
-      
-      if (!token) {
-        return;
-      }
-
-      const response = await axios.get(`${API_BASE_URL}/status/current-status`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        timeout: 10000
-      });
-
-      const data = response.data;
-      
-      const waterSafetyStatus = getWaterSafetyStatus(data.water_quality.classification);
-      const contaminationRisk = getContaminationRisk(data.water_quality.parameters);
-      const factors = analyzeFactors(data.water_quality.parameters);
-      const topFactor = getTopFactor(factors);
-      const explanation = generateExplanation(topFactor, data.water_quality.parameters);
-      
-      setAnalysis({
-        waterSafety: {
-          status: waterSafetyStatus.status,
-          level: waterSafetyStatus.level,
-          confidence: Math.round(data.water_quality.confidence * 100),
-        },
-        contaminationRisk: {
-          risk: contaminationRisk.risk,
-          level: contaminationRisk.level,
-          confidence: contaminationRisk.confidence,
-        },
-        factors,
-        topFactor,
-        explanation,
-      });
-      
-      updateLastCheck();
-    } catch (error) {
-      console.error('AI Analysis fetch error:', error.message);
-    }
-  };
-
-  const getWaterSafetyStatus = (classification) => {
-    if (classification === 'Safe') {
-      return { status: 'Safe to drink', level: 'Safe' };
-    } else if (classification === 'Moderate') {
-      return { status: 'Use with caution', level: 'Warning' };
-    } else {
-      return { status: 'Not safe to drink', level: 'Critical' };
-    }
-  };
-
-  const getContaminationRisk = (params) => {
-    let riskScore = 0;
-    
-    if (params.ph < 6.5 || params.ph > 8.5) riskScore += 2;
-    if (params.turbidity_index > 50) riskScore += 3;
-    if (params.tds > 500) riskScore += 2;
-    if (params.temperature > 30 || params.temperature < 15) riskScore += 1;
-    
-    if (riskScore >= 5) {
-      return { risk: 'High risk', level: 'Critical', confidence: 85 };
-    } else if (riskScore >= 3) {
-      return { risk: 'Medium risk', level: 'Warning', confidence: 72 };
-    } else {
-      return { risk: 'Low risk', level: 'Safe', confidence: 90 };
-    }
-  };
-
-  const analyzeFactors = (params) => {
-    const factors = {
-      turbidity: {
-        value: params.turbidity_index,
-        level: params.turbidity_index > 50 ? 'Very high' : params.turbidity_index > 30 ? 'High' : params.turbidity_index > 10 ? 'Moderate' : 'Low'
-      },
-      ph: {
-        value: Math.abs(params.ph - 7) * 20,
-        level: (params.ph < 6.5 || params.ph > 8.5) ? 'High' : (params.ph < 7 || params.ph > 7.5) ? 'Moderate' : 'Low'
-      },
-      tds: {
-        value: (params.tds / 1000) * 100,
-        level: params.tds > 500 ? 'High' : params.tds > 300 ? 'Moderate' : 'Low'
-      },
-      temperature: {
-        value: Math.abs(params.temperature - 25) * 5,
-        level: (params.temperature > 30 || params.temperature < 15) ? 'Very high' : (params.temperature > 28 || params.temperature < 20) ? 'Moderate' : 'Very low'
-      },
-    };
-    
-    return factors;
-  };
-
-  const getTopFactor = (factors) => {
-    const factorArray = [
-      { name: 'Turbidity', value: factors.turbidity.value },
-      { name: 'pH Level', value: factors.ph.value },
-      { name: 'TDS', value: factors.tds.value },
-      { name: 'Temperature', value: factors.temperature.value },
-    ];
-    
-    factorArray.sort((a, b) => b.value - a.value);
-    
-    return {
-      name: factorArray[0].name,
-      shapValue: (factorArray[0].value / 100).toFixed(3),
-    };
-  };
-
-  const generateExplanation = (topFactor, params) => {
-    const explanations = {
-      'Turbidity': `Your water is very murky right now — that's the main reason it's been flagged as unsafe. Turbidity is the highest contributing factor. Avoid drinking it until it clears up or has been treated.`,
-      'pH Level': `Your water's pH level is outside the safe range — that's the main reason it's been flagged. pH imbalance is the highest contributing factor. Avoid drinking it until the pH is corrected.`,
-      'TDS': `Your water has high dissolved solids — that's the main reason it's been flagged. TDS is the highest contributing factor. Consider using a filter or alternative water source.`,
-      'Temperature': `Your water temperature is unusual — that's a contributing factor to the safety concern. Temperature is affecting water quality. Let it normalize before drinking.`,
-    };
-    
-    return explanations[topFactor.name] || 'Water quality analysis in progress.';
-  };
-
-  const onRefresh = async () => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchAIAnalysis();
+    await fetchInsights();
     setRefreshing(false);
-  };
+  }, [fetchInsights]);
 
-  const getFactorBarWidth = (value) => {
-    return Math.min(Math.max(value, 0), 100);
-  };
+  const maxInfluence = Math.max(...insights.factors.map(factor => Math.abs(factor.shapValue)), 0.01);
 
   return (
     <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
       <StatusBar barStyle={theme.colors.statusBar} backgroundColor={theme.colors.statusBarBg} />
-      
-      <ScrollView 
+      <ScrollView
         showsVerticalScrollIndicator={false}
-        bounces={false}
-        contentContainerStyle={{ flexGrow: 1 }}
+        contentContainerStyle={{ paddingBottom: 32 }}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0891B2']} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.colors.primary]} />
         }
       >
-        {/* Header */}
-        <View className="px-5 pt-12 pb-4">
-          <View className="flex-row justify-between items-center">
-            <View>
-              <Text className="text-2xl font-bold" style={{ color: theme.colors.text }}>AI Analysis</Text>
-              <Text className="text-sm" style={{ color: theme.colors.textTertiary }}>Latest check · {lastCheck}</Text>
-            </View>
-            <View className="bg-cyan-100 px-3 py-2 rounded-lg flex-row items-center">
-              <MaterialCommunityIcons name="robot" size={16} color="#0891B2" />
-              <Text className="text-sm font-semibold text-cyan-600 ml-1">AI</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Water Safety Card */}
-        <View className={`mx-5 rounded-2xl p-5 mb-4 ${analysis.waterSafety.level === 'Critical' ? 'bg-red-50 border-2 border-red-200' : analysis.waterSafety.level === 'Warning' ? 'bg-yellow-50 border-2 border-yellow-200' : 'bg-green-50 border-2 border-green-200'}`}>
-          <View className="flex-row justify-between items-start mb-3">
-            <Text className="text-xs font-semibold text-slate-500 tracking-wider">WATER SAFETY</Text>
-            <View className={`px-3 py-1 rounded-full ${analysis.waterSafety.level === 'Critical' ? 'bg-red-200' : analysis.waterSafety.level === 'Warning' ? 'bg-yellow-200' : 'bg-green-200'}`}>
-              <Text className={`text-xs font-semibold ${analysis.waterSafety.level === 'Critical' ? 'text-red-700' : analysis.waterSafety.level === 'Warning' ? 'text-yellow-700' : 'text-green-700'}`}>
-                {analysis.waterSafety.level}
+        <View className="px-5 pt-12 pb-5">
+          <View className="flex-row items-start justify-between">
+            <View className="flex-1 pr-3">
+              <Text className="text-2xl font-bold" style={{ color: theme.colors.text }}>Water Insights</Text>
+              <Text className="text-sm mt-1" style={{ color: theme.colors.textSecondary }}>
+                Simple explanation from the latest water reading
               </Text>
             </View>
           </View>
-          <Text className={`text-2xl font-bold mb-2 ${analysis.waterSafety.level === 'Critical' ? 'text-red-900' : analysis.waterSafety.level === 'Warning' ? 'text-yellow-900' : 'text-green-900'}`}>
-            {analysis.waterSafety.status}
+          <Text className="text-xs mt-3" style={{ color: theme.colors.textTertiary }}>
+            {formatTimeSinceUpdate(insights.timestamp)}
           </Text>
-          <Text className="text-3xl font-bold text-slate-800">{analysis.waterSafety.confidence}%</Text>
-          <Text className="text-xs text-slate-500 mt-1">How confident the system is</Text>
         </View>
 
-        {/* Contamination Risk Card */}
-        <View className={`mx-5 rounded-2xl p-5 mb-5 ${analysis.contaminationRisk.level === 'Critical' ? 'bg-red-50 border-2 border-red-200' : analysis.contaminationRisk.level === 'Warning' ? 'bg-yellow-50 border-2 border-yellow-200' : 'bg-green-50 border-2 border-green-200'}`}>
-          <View className="flex-row justify-between items-start mb-3">
-            <Text className="text-xs font-semibold text-slate-500 tracking-wider">CONTAMINATION RISK</Text>
-            <View className={`px-3 py-1 rounded-full ${analysis.contaminationRisk.level === 'Critical' ? 'bg-red-200' : analysis.contaminationRisk.level === 'Warning' ? 'bg-yellow-200' : 'bg-green-200'}`}>
-              <Text className={`text-xs font-semibold ${analysis.contaminationRisk.level === 'Critical' ? 'text-red-700' : analysis.contaminationRisk.level === 'Warning' ? 'text-yellow-700' : 'text-green-700'}`}>
-                {analysis.contaminationRisk.level}
-              </Text>
-            </View>
+        {error && (
+          <View className="mx-5 mb-5 rounded-2xl p-4 border" style={{ borderColor: '#FCA5A5', backgroundColor: theme.isDarkMode ? '#451A1A' : '#FEF2F2' }}>
+            <Text className="text-sm leading-5" style={{ color: theme.isDarkMode ? '#FECACA' : '#991B1B' }}>{error}</Text>
+            <TouchableOpacity onPress={fetchInsights} className="mt-2 self-start" accessibilityRole="button" accessibilityLabel="Retry loading Water Insights">
+              <Text className="text-sm font-bold" style={{ color: theme.colors.primary }}>Retry</Text>
+            </TouchableOpacity>
           </View>
-          <Text className={`text-2xl font-bold mb-2 ${analysis.contaminationRisk.level === 'Critical' ? 'text-red-900' : analysis.contaminationRisk.level === 'Warning' ? 'text-yellow-900' : 'text-green-900'}`}>
-            {analysis.contaminationRisk.risk}
-          </Text>
-          <Text className="text-3xl font-bold text-slate-800">{analysis.contaminationRisk.confidence}%</Text>
-          <Text className="text-xs text-slate-500 mt-1">How confident the system is</Text>
-        </View>
+        )}
 
-        {/* What's Causing This */}
-        <View className="px-5 mb-4">
-          <Text className="text-xs font-semibold tracking-wider mb-4" style={{ color: theme.colors.textTertiary }}>WHAT'S CAUSING THIS?</Text>
-          
-          <View className="rounded-2xl p-5 shadow-sm" style={{ backgroundColor: theme.colors.cardBackground }}>
-            {/* Turbidity */}
-            <View className="mb-4">
-              <View className="flex-row justify-between items-center mb-2">
-                <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>Turbidity</Text>
-                <Text className="text-sm font-semibold" style={{ color: theme.colors.textSecondary }}>{analysis.factors.turbidity.level}</Text>
-              </View>
-              <View className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: theme.isDarkMode ? '#334155' : '#E2E8F0' }}>
-                <View 
-                  className="h-full bg-cyan-500 rounded-full" 
-                  style={{ width: `${getFactorBarWidth(analysis.factors.turbidity.value)}%` }}
-                />
-              </View>
-            </View>
-
-            {/* pH Level */}
-            <View className="mb-4">
-              <View className="flex-row justify-between items-center mb-2">
-                <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>pH Level</Text>
-                <Text className="text-sm font-semibold" style={{ color: theme.colors.textSecondary }}>{analysis.factors.ph.level}</Text>
-              </View>
-              <View className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: theme.isDarkMode ? '#334155' : '#E2E8F0' }}>
-                <View 
-                  className="h-full bg-cyan-500 rounded-full" 
-                  style={{ width: `${getFactorBarWidth(analysis.factors.ph.value)}%` }}
-                />
-              </View>
-            </View>
-
-            {/* TDS */}
-            <View className="mb-4">
-              <View className="flex-row justify-between items-center mb-2">
-                <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>TDS</Text>
-                <Text className="text-sm font-semibold" style={{ color: theme.colors.textSecondary }}>{analysis.factors.tds.level}</Text>
-              </View>
-              <View className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: theme.isDarkMode ? '#334155' : '#E2E8F0' }}>
-                <View 
-                  className="h-full bg-cyan-500 rounded-full" 
-                  style={{ width: `${getFactorBarWidth(analysis.factors.tds.value)}%` }}
-                />
-              </View>
-            </View>
-
-            {/* Temperature */}
-            <View>
-              <View className="flex-row justify-between items-center mb-2">
-                <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>Temperature</Text>
-                <Text className="text-sm font-semibold" style={{ color: theme.colors.textSecondary }}>{analysis.factors.temperature.level}</Text>
-              </View>
-              <View className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: theme.isDarkMode ? '#334155' : '#E2E8F0' }}>
-                <View 
-                  className="h-full bg-cyan-500 rounded-full" 
-                  style={{ width: `${getFactorBarWidth(analysis.factors.temperature.value)}%` }}
-                />
-              </View>
-            </View>
+        {loading ? (
+          <View className="items-center justify-center py-24">
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <Text className="text-sm mt-4" style={{ color: theme.colors.textSecondary }}>Interpreting the latest readings…</Text>
           </View>
-        </View>
+        ) : (
+          <>
 
-        {/* In Plain Words */}
-        <View className="px-5 mb-8">
-          <View className="bg-cyan-50 rounded-2xl p-5 border-l-4 border-cyan-500">
-            <View className="flex-row items-center mb-3">
-              <MaterialIcons name="info-outline" size={20} color="#0891B2" />
-              <Text className="text-sm font-semibold text-cyan-700 ml-2">In plain words</Text>
-            </View>
-            
-            <View className="bg-cyan-100 rounded-lg p-3 mb-3">
-              <View className="flex-row items-center">
-                <MaterialCommunityIcons name="star-four-points" size={16} color="#0891B2" />
-                <Text className="text-xs font-semibold text-cyan-700 ml-2">
-                  Top factor: {analysis.topFactor.name} (SHAP = {analysis.topFactor.shapValue})
+            <View className="px-5 mb-6">
+              <View className="rounded-2xl p-5 border" style={{ backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }}>
+                <View className="flex-row items-center mb-4">
+                  <View className="w-11 h-11 rounded-xl items-center justify-center mr-3" style={{ backgroundColor: theme.isDarkMode ? '#164E63' : '#ECFEFF' }}>
+                    <MaterialCommunityIcons name="water-check-outline" size={23} color={theme.colors.primary} />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-lg font-bold" style={{ color: theme.colors.text }}>Water condition summary</Text>
+                    <Text className="text-xs mt-0.5" style={{ color: theme.colors.textTertiary }}>In simple words</Text>
+                  </View>
+                </View>
+
+                <View className="flex-row flex-wrap mb-4">
+                  <View className="mr-2 mb-2 px-3 py-2 rounded-full" style={{ backgroundColor: `${insights.safety.color}18` }}>
+                    <Text className="text-xs font-bold" style={{ color: insights.safety.color }}>
+                      {insights.safety.status}
+                    </Text>
+                  </View>
+                  <View className="mb-2 px-3 py-2 rounded-full" style={{ backgroundColor: `${insights.risk.color}18` }}>
+                    <Text className="text-xs font-bold" style={{ color: insights.risk.color }}>
+                      {insights.risk.label}{insights.risk.score === null ? '' : ` • ${insights.risk.score}%`}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text className="text-base font-semibold leading-6" style={{ color: theme.colors.text }}>
+                  {insights.plainLanguage.summary}
                 </Text>
+
+                {insights.plainLanguage.concernDetails.map((detail, index) => (
+                  <View key={`${detail}-${index}`} className="flex-row items-start mt-3">
+                    <View className="w-2 h-2 rounded-full bg-amber-500 mt-2 mr-3" />
+                    <Text className="text-sm leading-6 flex-1" style={{ color: theme.colors.textSecondary }}>{detail}</Text>
+                  </View>
+                ))}
+
+                <View className="mt-5 rounded-xl p-4" style={{ backgroundColor: insights.safety.level === 'Critical' || insights.risk.level === 'High' ? (theme.isDarkMode ? '#451A1A' : '#FEF2F2') : (theme.isDarkMode ? '#172554' : '#EFF6FF') }}>
+                  <Text className="text-xs font-bold tracking-wider mb-1" style={{ color: insights.safety.level === 'Critical' || insights.risk.level === 'High' ? '#EF4444' : '#3B82F6' }}>ACTION TO TAKE</Text>
+                  <Text className="text-sm leading-5" style={{ color: theme.colors.text }}>{insights.plainLanguage.action}</Text>
+                </View>
               </View>
             </View>
-            
-            <Text className="text-sm leading-6" style={{ color: theme.isDarkMode ? '#334155' : '#475569' }}>
-              {analysis.explanation}
-            </Text>
-          </View>
-        </View>
+
+            <View className="px-5 mb-6">
+              <Text className="text-xs font-semibold tracking-wider mb-4" style={{ color: theme.colors.textTertiary }}>WHAT EACH READING MEANS</Text>
+              {insights.sensorAssessments.map(sensor => (
+                <View
+                  key={sensor.key}
+                  className="rounded-2xl p-5 mb-3 border"
+                  style={{ backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }}
+                  accessibilityLabel={`${sensor.name} assessment`}
+                >
+                  <View className="flex-row items-start justify-between mb-3">
+                    <View className="flex-1 pr-3">
+                      <Text className="text-sm font-semibold" style={{ color: theme.colors.textSecondary }}>{sensor.name}</Text>
+                      <View className="flex-row items-baseline mt-1">
+                        <Text className="text-3xl font-bold" style={{ color: theme.colors.text }}>{sensor.value === null ? '--' : sensor.value}</Text>
+                        {sensor.unit ? <Text className="text-sm ml-1" style={{ color: theme.colors.textSecondary }}>{sensor.unit}</Text> : null}
+                      </View>
+                      <Text className="text-xs mt-1" style={{ color: theme.colors.textTertiary }}>{sensor.range}</Text>
+                    </View>
+                    <View className="px-3 py-1.5 rounded-full" style={{ backgroundColor: sensor.background }}>
+                      <Text className="text-xs font-bold" style={{ color: sensor.color }}>{sensor.band}</Text>
+                    </View>
+                  </View>
+                  <View className="h-px mb-3" style={{ backgroundColor: theme.colors.border }} />
+                  <Text className="text-sm font-bold mb-1" style={{ color: sensor.color }}>{sensor.headline}</Text>
+                  <Text className="text-sm leading-5" style={{ color: theme.colors.textSecondary }}>{sensor.explanation}</Text>
+                  {sensor.nextStep ? (
+                    <View className="mt-3 rounded-xl p-3" style={{ backgroundColor: theme.isDarkMode ? '#0F172A' : '#F8FAFC' }}>
+                      <Text className="text-[11px] font-bold tracking-wider mb-1" style={{ color: theme.colors.textTertiary }}>WHAT TO DO</Text>
+                      <Text className="text-sm leading-5" style={{ color: theme.colors.text }}>{sensor.nextStep}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              ))}
+            </View>
+
+            <View className="px-5 mb-6">
+              <Text className="text-xs font-semibold tracking-wider mb-4" style={{ color: theme.colors.textTertiary }}>WHY THE APP GAVE THIS RESULT</Text>
+              <View className="rounded-2xl p-5 border" style={{ backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }}>
+                <View className="flex-row items-start mb-4">
+                  <MaterialCommunityIcons name="chart-timeline-variant" size={23} color={theme.colors.primary} />
+                  <View className="flex-1 ml-3">
+                    <Text className="text-sm font-bold" style={{ color: theme.colors.text }}>Prediction reason</Text>
+                    <Text className="text-sm leading-5 mt-1" style={{ color: theme.colors.textSecondary }}>{insights.explanation}</Text>
+                  </View>
+                </View>
+
+                <Text className="text-xs leading-5 mb-4" style={{ color: theme.colors.textTertiary }}>
+                  The bars show which readings affected the prediction most. Amber means the app became more concerned; green means the app became less concerned. This does not replace the simple explanations above.
+                </Text>
+
+                {insights.factors.length === 0 ? (
+                  <View className="items-center py-6">
+                    <MaterialCommunityIcons name="chart-box-outline" size={32} color={theme.colors.textTertiary} />
+                    <Text className="text-sm text-center mt-3" style={{ color: theme.colors.textSecondary }}>
+                      The app could not explain which readings affected this prediction.
+                    </Text>
+                  </View>
+                ) : insights.factors.map((factor, index) => {
+                  const width = Math.max(8, Math.round((Math.abs(factor.shapValue) / maxInfluence) * 100));
+                  const strengthLabel = width >= 67 ? 'Strong effect' : width >= 34 ? 'Medium effect' : 'Small effect';
+                  const increasing = factor.direction !== 'decreasing_risk';
+                  const color = increasing ? '#F59E0B' : '#10B981';
+                  return (
+                    <View key={`${factor.feature}-${index}`} className={index < insights.factors.length - 1 ? 'mb-5' : ''}>
+                      <View className="flex-row justify-between items-start mb-2">
+                        <View className="flex-1 pr-2">
+                          <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>{factor.name}</Text>
+                          <Text className="text-xs mt-0.5" style={{ color: theme.colors.textTertiary }}>
+                            {factor.contextLabel}{factor.observedLabel ? ` • ${factor.observedLabel}` : ''}
+                          </Text>
+                        </View>
+                        <Text className="text-xs font-semibold" style={{ color }}>{factor.effectLabel}</Text>
+                      </View>
+                      <View className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: theme.isDarkMode ? '#334155' : '#E2E8F0' }}>
+                        <View className="h-full rounded-full" style={{ width: `${width}%`, backgroundColor: color }} />
+                      </View>
+                      <View className="flex-row justify-between mt-1.5">
+                        <Text className="text-[11px] flex-1 pr-2" style={{ color: theme.colors.textTertiary }}>
+                          {factor.effectExplanation}
+                        </Text>
+                        <Text className="text-[11px]" style={{ color: theme.colors.textTertiary }}>
+                          {strengthLabel}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          </>
+        )}
       </ScrollView>
     </View>
   );

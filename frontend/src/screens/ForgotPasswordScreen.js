@@ -5,7 +5,6 @@ import {
   TextInput,
   TouchableOpacity,
   StatusBar,
-  Alert,
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
@@ -13,25 +12,26 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useTheme } from '../context/ThemeContext';
 import { authAPI } from '../services/api';
+import { showAppAlert } from '../utils/alertHelper';
 
 const ForgotPasswordScreen = ({ navigation }) => {
   const { theme } = useTheme();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const validateEmail = (email) => {
+  const validateEmail = emailValue => {
     const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-    return emailRegex.test(email);
+    return emailRegex.test(emailValue);
   };
 
   const handleSendResetLink = async () => {
     if (!email.trim()) {
-      Alert.alert('Validation Error', 'Please enter your email address');
+      showAppAlert('Email required', 'Please enter your email address.', [], 'warning');
       return;
     }
 
     if (!validateEmail(email)) {
-      Alert.alert('Invalid Email', 'Please enter a valid email address');
+      showAppAlert('Invalid email', 'Please enter a valid email address.', [], 'warning');
       return;
     }
 
@@ -39,28 +39,18 @@ const ForgotPasswordScreen = ({ navigation }) => {
 
     try {
       await authAPI.forgotPassword(email.trim().toLowerCase());
-      
-      Alert.alert(
-        'Reset Code Sent',
-        'We\'ve sent a 6-digit reset code to your email. Please check your inbox and spam folder.',
-        [
-          {
-            text: 'OK',
-            onPress: () => navigation.navigate('ResetPassword', { email: email.trim().toLowerCase() })
-          }
-        ]
-      );
+
+      showAppAlert('Reset code sent', 'We have sent a 6-digit reset code to your email. Please check your inbox and spam folder.', [{ text: 'Continue', onPress: () => navigation.navigate('ResetPassword', { email: email.trim().toLowerCase() }) }], 'success');
     } catch (error) {
-      console.error('Forgot password error:', error);
 
       if (error.response?.status === 404) {
-        Alert.alert('Email Not Found', 'No account found with this email address.');
+        showAppAlert('Email not found', 'No account found with this email address.', [], 'error');
       } else if (error.response?.data?.detail) {
-        Alert.alert('Error', error.response.data.detail);
+        showAppAlert('Request failed', error.response.data.detail, [], 'error');
       } else if (error.message === 'Network Error') {
-        Alert.alert('Connection Error', 'Cannot connect to server. Please check your internet connection.');
+        showAppAlert('Connection error', 'Cannot connect right now. Please check your internet connection.', [], 'error');
       } else {
-        Alert.alert('Error', 'Failed to send reset link. Please try again later.');
+        showAppAlert('Request not completed', 'The reset code could not be sent. Please try again later.', [], 'error');
       }
     } finally {
       setLoading(false);
@@ -82,14 +72,14 @@ const ForgotPasswordScreen = ({ navigation }) => {
       {/* Header Section */}
       <View className="bg-[#0B7FA5] pt-12 pb-12 px-6 relative overflow-hidden">
         <View className="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-white/10" />
-        
+
         <TouchableOpacity className="flex-row items-center mb-8" onPress={handleBack}>
           <MaterialIcons name="arrow-back" size={24} color="#FFFFFF" />
           <Text className="text-white text-base ml-2 font-medium">Back</Text>
         </TouchableOpacity>
 
-        <Text className="text-4xl font-bold text-white mb-2">Forgot Password?</Text>
-        <Text className="text-base text-cyan-100">We'll send a reset link to your email</Text>
+        <Text className="text-4xl font-bold text-white mb-2">Forgot password?</Text>
+        <Text className="text-base text-cyan-100">We'll send a reset code to your email</Text>
       </View>
 
       {/* Form Section */}
@@ -101,10 +91,10 @@ const ForgotPasswordScreen = ({ navigation }) => {
           </View>
           <View className="flex-1">
             <Text className="text-base font-bold mb-1" style={{ color: theme.isDarkMode ? '#DBEAFE' : '#1E3A8A' }}>
-              Email reset link
+              Email reset code
             </Text>
             <Text className="text-sm leading-5" style={{ color: theme.isDarkMode ? '#BFDBFE' : '#3B82F6' }}>
-              Enter the email address associated with your account and we'll send you a password reset link.
+              Enter the email address on your account and we'll send you a password reset code.
             </Text>
           </View>
         </View>
@@ -132,8 +122,8 @@ const ForgotPasswordScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Send Reset Link Button */}
-        <TouchableOpacity 
+        {/* Send reset code Button */}
+        <TouchableOpacity
           className={`rounded-xl h-14 justify-center items-center mb-4 ${loading ? 'bg-slate-400' : 'bg-[#0B7FA5]'}`}
           onPress={handleSendResetLink}
           disabled={loading}
@@ -141,7 +131,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
           {loading ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text className="text-white text-base font-semibold">Send Reset Link</Text>
+            <Text className="text-white text-base font-semibold">Send reset code</Text>
           )}
         </TouchableOpacity>
 
@@ -153,7 +143,6 @@ const ForgotPasswordScreen = ({ navigation }) => {
           </Text>
         </View>
 
-        {/* Sign In Link */}
         <View className="flex-row justify-center items-center mb-8">
           <Text className="text-sm" style={{ color: theme.colors.textSecondary }}>Remembered it? </Text>
           <TouchableOpacity onPress={handleSignIn} disabled={loading}>

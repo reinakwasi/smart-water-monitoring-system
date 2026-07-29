@@ -11,15 +11,15 @@ logger = logging.getLogger(__name__)
 
 class MongoDB:
     """MongoDB connection manager with lifecycle management"""
-    
+
     def __init__(self):
         self.client: Optional[AsyncIOMotorClient] = None
         self.db: Optional[AsyncIOMotorDatabase] = None
-    
+
     async def connect(self):
         """
         Establish MongoDB connection with connection pooling
-        
+
         Connection pooling configuration:
         - maxPoolSize: Maximum number of connections in the pool
         - minPoolSize: Minimum number of connections to maintain
@@ -28,7 +28,7 @@ class MongoDB:
         """
         try:
             logger.info("Connecting to configured MongoDB instance")
-            
+
             self.client = AsyncIOMotorClient(
                 settings.mongodb_url,
                 maxPoolSize=settings.mongodb_max_pool_size,
@@ -36,24 +36,24 @@ class MongoDB:
                 serverSelectionTimeoutMS=5000,
                 connectTimeoutMS=10000,
             )
-            
+
             # Verify connection by pinging the server
             await self.client.admin.command('ping')
-            
+
             self.db = self.client[settings.mongodb_db_name]
-            
+
             logger.info(
                 f"Successfully connected to MongoDB database: {settings.mongodb_db_name} "
                 f"(pool size: {settings.mongodb_min_pool_size}-{settings.mongodb_max_pool_size})"
             )
-            
+
             # Create indexes for performance optimization
             await self._create_indexes()
-            
+
         except Exception as e:
             logger.error(f"Failed to connect to MongoDB: {e}")
             raise
-    
+
     async def disconnect(self):
         """Close MongoDB connection and cleanup resources"""
         if self.client:
@@ -66,7 +66,7 @@ class MongoDB:
             except Exception as e:
                 logger.error(f"Error closing MongoDB connection: {e}")
                 raise
-    
+
     async def _create_indexes(self):
         """Create database indexes for query optimization"""
         try:
@@ -74,33 +74,47 @@ class MongoDB:
             await self.db.sensor_readings.create_index("device_id")
             await self.db.sensor_readings.create_index("timestamp")
             await self.db.sensor_readings.create_index([("device_id", 1), ("timestamp", -1)])
-            
+
             # Tank level readings collection indexes
             await self.db.tank_readings.create_index("device_id")
             await self.db.tank_readings.create_index("timestamp")
             await self.db.tank_readings.create_index([("device_id", 1), ("timestamp", -1)])
-            
+
             # Users collection indexes
             await self.db.users.create_index("email", unique=True)
-            
+
             # Sensor devices collection indexes
             await self.db.sensor_devices.create_index("device_id", unique=True)
-            
+
+            # User-device associations collection indexes
+            await self.db.user_device_associations.create_index("user_id")
+            await self.db.user_device_associations.create_index("device_id", unique=True)
+            await self.db.user_device_associations.create_index([("user_id", 1), ("is_active", 1)])
+            await self.db.user_device_associations.create_index([("device_id", 1), ("is_active", 1)])
+
+            # API key audit logs collection indexes
+            await self.db.api_key_audit_logs.create_index("device_id")
+            await self.db.api_key_audit_logs.create_index([("timestamp", -1)])
+
+            # Admin audit logs collection indexes
+            await self.db.admin_audit_logs.create_index("user_id")
+            await self.db.admin_audit_logs.create_index([("timestamp", -1)])
+
             logger.info("Database indexes created successfully")
-            
+
         except Exception as e:
             logger.warning(f"Error creating indexes (may already exist): {e}")
-    
+
     def get_database(self) -> AsyncIOMotorDatabase:
         """Get the database instance"""
         if self.db is None:
             raise RuntimeError("Database not connected. Call connect() first.")
         return self.db
-    
+
     async def health_check(self) -> dict:
         """
         Check MongoDB connection health and return status
-        
+
         Returns:
             dict: Health status with connection state and latency
         """
@@ -109,16 +123,16 @@ class MongoDB:
                 "status": "disconnected",
                 "latency_ms": None
             }
-        
+
         try:
             import time
             start_time = time.time()
-            
+
             # Ping the database to check connection
             await self.client.admin.command('ping')
-            
+
             latency_ms = (time.time() - start_time) * 1000
-            
+
             return {
                 "status": "connected",
                 "latency_ms": round(latency_ms, 2)
@@ -139,7 +153,7 @@ mongodb = MongoDB()
 async def get_database() -> AsyncIOMotorDatabase:
     """
     Dependency function to get database instance
-    
+
     Usage in FastAPI endpoints:
         @app.get("/endpoint")
         async def endpoint(db: AsyncIOMotorDatabase = Depends(get_database)):

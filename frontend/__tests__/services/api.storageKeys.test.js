@@ -20,12 +20,12 @@ jest.mock('axios', () => ({
   post: jest.fn(),
 }));
 
-import { 
-  TOKEN_KEY, 
-  REFRESH_TOKEN_KEY, 
-  USER_NAME_KEY, 
-  USER_EMAIL_KEY, 
-  USER_PROFILE_KEY 
+import {
+  TOKEN_KEY,
+  REFRESH_TOKEN_KEY,
+  USER_NAME_KEY,
+  USER_EMAIL_KEY,
+  USER_PROFILE_KEY
 } from '../../src/services/api';
 
 describe('API Storage Key Constants', () => {

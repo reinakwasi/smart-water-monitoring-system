@@ -5,8 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import { getFCMToken, setupFCMListeners } from './src/services/fcm';
-import { ThemeProvider } from './src/context/ThemeContext';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { setAlertHandler } from './src/utils/alertHelper';
 import CustomAlert from './src/components/CustomAlert';
 import OnboardingScreen from './src/screens/OnboardingScreen';
@@ -21,23 +20,34 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
 import ResetPasswordScreen from './src/screens/ResetPasswordScreen';
+import DevicesScreen from './src/screens/DevicesScreen';
 import EditProfileScreen from './src/screens/EditProfileScreen';
 import ExportDataScreen from './src/screens/ExportDataScreen';
+import ChangePasswordScreen from './src/screens/ChangePasswordScreen';
 
 const { width, height } = Dimensions.get('window');
 const ONBOARDING_COMPLETED_KEY = '@onboarding_completed';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
+const TAB_ICONS = {
+  Home: 'home',
+  Insights: 'insights',
+  Tank: 'water-drop',
+  Alerts: 'notifications-none',
+  Settings: 'settings',
+};
+
 
 function MainTabs() {
+  const { theme } = useTheme();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#FFFFFF',
+          backgroundColor: theme.colors.cardBackground,
           borderTopWidth: 1,
-          borderTopColor: '#F1F5F9',
+          borderTopColor: theme.colors.border,
           height: 65,
           paddingBottom: 10,
           paddingTop: 8,
@@ -50,23 +60,9 @@ function MainTabs() {
           marginTop: -4,
         },
         tabBarIcon: ({ focused, color }) => {
-          let iconName;
-
-          if (route.name === 'Home') {
-            iconName = 'home';
-          } else if (route.name === 'Reports') {
-            iconName = 'access-time';
-          } else if (route.name === 'Tank') {
-            iconName = 'inbox';
-          } else if (route.name === 'Alerts') {
-            iconName = 'notifications-none';
-          } else if (route.name === 'Settings') {
-            iconName = 'wb-sunny';
-          }
-
           return (
             <View style={{ alignItems: 'center' }}>
-              <MaterialIcons name={iconName} size={24} color={color} />
+              <MaterialIcons name={TAB_ICONS[route.name]} size={24} color={color} />
               {focused && (
                 <View
                   style={{
@@ -84,7 +80,7 @@ function MainTabs() {
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Reports" component={ReportsScreen} />
+      <Tab.Screen name="Insights" component={ReportsScreen} />
       <Tab.Screen name="Tank" component={TankScreen} />
       <Tab.Screen name="Alerts" component={AlertsScreen} />
       <Tab.Screen name="Settings" component={SettingsScreen} />
@@ -107,8 +103,8 @@ function App() {
   useEffect(() => {
     const checkOnboardingStatus = async () => {
       try {
-        await AsyncStorage.getItem(ONBOARDING_COMPLETED_KEY);
-        setShowOnboarding(true);
+        const completed = await AsyncStorage.getItem(ONBOARDING_COMPLETED_KEY);
+        setShowOnboarding(completed !== 'true');
       } catch (error) {
         setShowOnboarding(true);
       } finally {
@@ -119,17 +115,6 @@ function App() {
     checkOnboardingStatus();
   }, []);
 
-  useEffect(() => {
-    const initializeFCM = async () => {
-      try {
-        await getFCMToken();
-      } catch (error) {
-      }
-    };
-
-    initializeFCM();
-    setupFCMListeners();
-  }, []);
 
   const handleOnboardingFinish = async () => {
     try {
@@ -143,7 +128,7 @@ function App() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowSplash(false);
-    }, 7000);
+    }, 1200);
 
     return () => clearTimeout(timer);
   }, []);
@@ -156,7 +141,7 @@ function App() {
     return (
       <View style={{flex: 1, backgroundColor: '#0a1929'}}>
         <StatusBar barStyle="light-content" />
-        <Image 
+        <Image
           source={require('./src/assets/splashscreen.png')}
           style={{width: width, height: height, position: 'absolute'}}
           resizeMode="cover"
@@ -176,7 +161,7 @@ function App() {
   return (
     <ThemeProvider>
       <NavigationContainer>
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="SignUp" component={SignUpScreen} />
           <Stack.Screen name="OTPVerification" component={OTPVerificationScreen} />
@@ -184,8 +169,10 @@ function App() {
           <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
           <Stack.Screen name="MainApp" component={MainTabs} />
           <Stack.Screen name="History" component={HistoryScreen} />
+          <Stack.Screen name="Devices" component={DevicesScreen} />
           <Stack.Screen name="EditProfile" component={EditProfileScreen} />
           <Stack.Screen name="ExportData" component={ExportDataScreen} />
+          <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
         </Stack.Navigator>
       </NavigationContainer>
       <CustomAlert

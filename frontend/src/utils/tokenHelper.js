@@ -9,7 +9,6 @@ export const getAuthToken = async () => {
   try {
     return await AsyncStorage.getItem(TOKEN_KEY);
   } catch (error) {
-    console.error('Error retrieving auth token:', error);
     return null;
   }
 };
