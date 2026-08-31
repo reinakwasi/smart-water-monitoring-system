@@ -1,3 +1,5 @@
+import { classifyParameter } from './parameterClassification';
+
 export const APP_SETTINGS_KEY = '@app_settings';
 export const DEFAULT_TANK_CAPACITY_LITRES = 500;
 export const DEVICE_OFFLINE_AFTER_MS = 90 * 1000;
@@ -46,6 +48,53 @@ export const getClassificationColor = (classification) => {
   return '#475569';
 };
 
+const PARAMETER_NAMES = {
+  ph: 'pH',
+  turbidity_index: 'Turbidity',
+  temperature: 'Temperature',
+  tds: 'TDS',
+};
+
+const UNSAFE_BANDS = ['Unsafe', 'Unacceptable', 'Acidic/Unsafe', 'Alkaline/Unsafe'];
+const WARNING_BANDS = ['Poor', 'Warm'];
+
+const getParameterBand = (parameter, value, parameterClassifications = {}) => {
+  const savedBand = parameterClassifications[parameter];
+  if (savedBand) return savedBand;
+  if (value === null || value === undefined) return null;
+
+  try {
+    return classifyParameter(parameter, value).band;
+  } catch (error) {
+    return null;
+  }
+};
+
+const getParameterConcern = (parameters, parameterClassifications = {}) => {
+  const entries = [
+    ['ph', parameters.ph],
+    ['turbidity_index', parameters.turbidity],
+    ['temperature', parameters.temperature],
+    ['tds', parameters.tds],
+  ];
+
+  for (const [parameter, value] of entries) {
+    const band = getParameterBand(parameter, value, parameterClassifications);
+    if (UNSAFE_BANDS.includes(band)) {
+      return { level: 'Unsafe', label: `${PARAMETER_NAMES[parameter]} needs attention`, band };
+    }
+  }
+
+  for (const [parameter, value] of entries) {
+    const band = getParameterBand(parameter, value, parameterClassifications);
+    if (WARNING_BANDS.includes(band)) {
+      return { level: 'Warning', label: `${PARAMETER_NAMES[parameter]} needs attention`, band };
+    }
+  }
+
+  return null;
+};
+
 export const getRiskPresentation = (riskLevel) => {
   if (riskLevel === 'High') return { label: 'High risk', color: '#FCA5A5' };
   if (riskLevel === 'Medium') return { label: 'Medium risk', color: '#FDE68A' };
@@ -67,7 +116,17 @@ export const mapCurrentStatus = (payload = {}, options = {}) => {
   const water = payload.water_quality || {};
   const tank = payload.tank_status || {};
   const risk = payload.contamination_risk || {};
-  const rawClassification = water.classification || null;
+  const modelClassification = water.classification || null;
+  const parameters = {
+    ph: finiteNumber(water.parameters?.ph),
+    turbidity: finiteNumber(water.parameters?.turbidity_index),
+    temperature: finiteNumber(water.parameters?.temperature),
+    tds: finiteNumber(water.parameters?.tds),
+  };
+  const parameterClassifications = water.parameter_classifications || {};
+  const parameterConcern = getParameterConcern(parameters, parameterClassifications);
+  const shouldShowParameterConcern = modelClassification === 'Safe' && parameterConcern;
+  const rawClassification = shouldShowParameterConcern ? parameterConcern.level : modelClassification;
   const rawLevelPercent = finiteNumber(tank.level_percent, null);
   const levelPercent = Math.min(100, Math.max(0, rawLevelPercent ?? 0));
   const reportedVolumeLitres = Math.max(0, finiteNumber(tank.volume_liters, 0));
@@ -83,17 +142,14 @@ export const mapCurrentStatus = (payload = {}, options = {}) => {
   return {
     waterQuality: {
       rawClassification,
-      classification: getClassificationLabel(rawClassification),
+      modelClassification,
+      classification: shouldShowParameterConcern ? parameterConcern.label : getClassificationLabel(rawClassification),
       confidence: water.confidence == null
         ? null
         : Math.round(Math.min(1, Math.max(0, finiteNumber(water.confidence, 0))) * 100),
-      parameters: {
-        ph: finiteNumber(water.parameters?.ph),
-        turbidity: finiteNumber(water.parameters?.turbidity_index),
-        temperature: finiteNumber(water.parameters?.temperature),
-        tds: finiteNumber(water.parameters?.tds),
-      },
-      parameterClassifications: water.parameter_classifications || {},
+      parameters,
+      parameterClassifications,
+      parameterConcern,
       timestamp: validDate(water.timestamp),
     },
     contaminationRisk: {

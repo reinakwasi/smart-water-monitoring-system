@@ -34,6 +34,28 @@ describe('home status utilities', () => {
     expect(mapped.tankStatus.status).toBe('Half full');
   });
 
+  it('shows a clear warning when an individual sensor band is unsafe', () => {
+    const mapped = mapCurrentStatus({
+      water_quality: {
+        classification: 'Safe',
+        confidence: 0.67,
+        parameters: { ph: 9.8, turbidity_index: 0.5, temperature: 26, tds: 0 },
+        parameter_classifications: {
+          ph: 'Alkaline/Unsafe',
+          turbidity_index: 'Excellent',
+          temperature: 'Normal',
+          tds: 'Excellent',
+        },
+        timestamp: '2026-08-05T12:00:00Z',
+      },
+      contamination_risk: { risk_level: 'Low', risk_score: 0.03 },
+    });
+
+    expect(mapped.waterQuality.modelClassification).toBe('Safe');
+    expect(mapped.waterQuality.rawClassification).toBe('Unsafe');
+    expect(mapped.waterQuality.classification).toBe('pH needs attention');
+    expect(mapped.waterQuality.parameterConcern).toMatchObject({ level: 'Unsafe', band: 'Alkaline/Unsafe' });
+  });
   it('uses the saved tank capacity when calculating available litres', () => {
     const mapped = mapCurrentStatus({
       tank_status: {

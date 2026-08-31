@@ -1,21 +1,30 @@
+/*
+ * AquaGuard Water Quality Monitor - ESP32
+ * Reads pH, turbidity, temperature, TDS, and tank level sensors
+ * Transmits data to backend API via WiFi
+ */
+
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 
+// ===================== CONFIGURATION =====================
+// Load configuration from local_config.h if available
 #if __has_include("local_config.h")
 #include "local_config.h"
 #endif
 
+// Default configuration (override in local_config.h)
 #ifndef AQUAGUARD_WIFI_SSID
-#define AQUAGUARD_WIFI_SSID "YOUR_WIFI_NAME"
+#define AQUAGUARD_WIFI_SSID "Rein"
 #endif
 #ifndef AQUAGUARD_WIFI_PASSWORD
-#define AQUAGUARD_WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
+#define AQUAGUARD_WIFI_PASSWORD "rein7344"
 #endif
 #ifndef AQUAGUARD_SERVER_IP
-#define AQUAGUARD_SERVER_IP "YOUR_LAPTOP_IPV4"
+#define AQUAGUARD_SERVER_IP "172.20.10.5"
 #endif
 #ifndef AQUAGUARD_SERVER_PORT
 #define AQUAGUARD_SERVER_PORT 8080
@@ -28,18 +37,13 @@
 #endif
 
 // ===================== WIFI SETTINGS =====================
-// Private values should be placed in local_config.h, not committed to Git.
 const char* ssid = AQUAGUARD_WIFI_SSID;
 const char* password = AQUAGUARD_WIFI_PASSWORD;
 
 // ===================== SERVICE SETTINGS ==================
-// Use your laptop IPv4 address while testing on the same WiFi/hotspot.
 const char* serverIP = AQUAGUARD_SERVER_IP;
 const int serverPort = AQUAGUARD_SERVER_PORT;
 const char* deviceId = AQUAGUARD_DEVICE_ID;
-
-// The monitoring service currently accepts simple device uploads.
-// Leave this empty unless device keys are enabled again.
 const char* deviceApiKey = AQUAGUARD_DEVICE_API_KEY;
 
 // ===================== SENSOR PINS =======================
@@ -48,21 +52,24 @@ const char* deviceApiKey = AQUAGUARD_DEVICE_API_KEY;
 #define ONE_WIRE_BUS 4
 #define TRIG_PIN 5
 #define ECHO_PIN 25
+// Use an ADC1 pin for pH when WiFi is active. GPIO14 is ADC2 and can conflict with WiFi on ESP32.
 #define PH_PIN 35
 
-// Set this to true only after the pH probe is connected and calibrated.
-#define PH_SENSOR_CONNECTED false
+// The pH probe is connected and calibrated for the final project sketch.
+#define PH_SENSOR_CONNECTED true
 
 // ===================== ADC / SAMPLING ====================
 #define VREF 3.3
 #define SCOUNT 30
 int analogBuffer[SCOUNT];
 int analogBufferIndex = 0;
+int phAnalogBuffer[SCOUNT];
+int phAnalogBufferIndex = 0;
 
 // ===================== TURBIDITY CALIBRATION =============
 // Step 1: Put the turbidity probe in clean/clear water, read the voltage, and put it here.
-#define TURBIDITY_CLEAR_WATER_VOLTAGE 1.72
-#define TURBIDITY_CLEAR_WATER_DEADBAND 0.04
+#define TURBIDITY_CLEAR_WATER_VOLTAGE 1.64
+#define TURBIDITY_CLEAR_WATER_DEADBAND 0.06
 
 // Step 2: If you do not have a bought NTU standard, use a cloudy-water reference for comparison.
 // Your current sensor showed about 1.20V in a cloudy/attention condition, so this maps that area to about 400 NTU.
@@ -70,10 +77,12 @@ int analogBufferIndex = 0;
 #define TURBIDITY_CLOUDY_REFERENCE_NTU 400.0
 
 // ===================== PH CALIBRATION ====================
-// Replace these after calibration. If you only have neutral water, start with the pH 7 value.
-// Many pH modules give different voltages, so these constants must match your own probe.
-#define PH_7_VOLTAGE 1.65
-#define PH_4_VOLTAGE 2.10
+// Two-point calibration from the tested probe:
+// near-neutral water: pH 7.0 at 2.60V
+// alkaline washing-powder sample: pH 10.0 at 2.05V
+// pH = (PH_SLOPE * voltage) + PH_OFFSET
+#define PH_SLOPE -5.45
+#define PH_OFFSET 21.17
 
 // ===================== TEMPERATURE =======================
 OneWire oneWire(ONE_WIRE_BUS);
@@ -129,20 +138,10 @@ float readPH() {
     return 7.0;
   }
 
-  long sum = 0;
-  const int samples = 10;
-  for (int i = 0; i < samples; i++) {
-    sum += readAnalogSettled(PH_PIN);
-    delay(5);
-  }
+  int medianValue = getMedianNum(phAnalogBuffer, SCOUNT);
+  phVoltage = medianValue * VREF / 4096.0;
 
-  float raw = sum / (float)samples;
-  float voltage = raw * VREF / 4095.0;
-  phVoltage = voltage;
-
-  float slope = (7.0 - 4.0) / (PH_7_VOLTAGE - PH_4_VOLTAGE);
-  float ph = 7.0 + ((voltage - PH_7_VOLTAGE) * slope);
-
+  float ph = (PH_SLOPE * phVoltage) + PH_OFFSET;
   return clampFloat(ph, 0.0, 14.0);
 }
 
@@ -296,6 +295,13 @@ void setup() {
   analogReadResolution(12);
   analogSetAttenuation(ADC_11db);
 
+  if (PH_SENSOR_CONNECTED) {
+    int initialPHReading = readAnalogSettled(PH_PIN);
+    for (int i = 0; i < SCOUNT; i++) {
+      phAnalogBuffer[i] = initialPHReading;
+    }
+  }
+
   tempSensor.begin();
   connectWiFi();
   delay(2000);
@@ -308,6 +314,12 @@ void loop() {
     analogBuffer[analogBufferIndex] = readAnalogSettled(TDS_PIN);
     analogBufferIndex++;
     if (analogBufferIndex == SCOUNT) analogBufferIndex = 0;
+
+    if (PH_SENSOR_CONNECTED) {
+      phAnalogBuffer[phAnalogBufferIndex] = readAnalogSettled(PH_PIN);
+      phAnalogBufferIndex++;
+      if (phAnalogBufferIndex == SCOUNT) phAnalogBufferIndex = 0;
+    }
   }
 
   static unsigned long printTimepoint = millis();

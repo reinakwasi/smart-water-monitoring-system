@@ -16,6 +16,7 @@ from sklearn.metrics import (
     precision_score,
     recall_score,
     f1_score,
+    roc_auc_score,
     confusion_matrix,
     classification_report
 )
@@ -206,6 +207,19 @@ class ClassifierTrainer:
         recall = recall_score(y_test, y_pred, average='weighted', zero_division=0)
         f1 = f1_score(y_test, y_pred, average='weighted', zero_division=0)
 
+        # Compute ROC-AUC
+        auc_roc = None
+        try:
+            y_pred_proba = self.model.predict_proba(X_test)
+            if len(np.unique(y_test)) == 2:
+                # Binary classification
+                auc_roc = roc_auc_score(y_test, y_pred_proba[:, 1])
+            else:
+                # Multi-class classification
+                auc_roc = roc_auc_score(y_test, y_pred_proba, multi_class='ovr', average='weighted')
+        except Exception as e:
+            print(f"Warning: Could not compute ROC-AUC: {str(e)}")
+
         # Compute confusion matrix
         cm = confusion_matrix(y_test, y_pred)
 
@@ -230,6 +244,7 @@ class ClassifierTrainer:
             'precision': float(precision),
             'recall': float(recall),
             'f1_score': float(f1),
+            'auc_roc': float(auc_roc) if auc_roc is not None else None,
             'confusion_matrix': cm.tolist(),
             'classification_report': class_report,
             'feature_importances': feature_importances
@@ -239,6 +254,8 @@ class ClassifierTrainer:
         print(f"Precision: {precision:.4f}")
         print(f"Recall: {recall:.4f}")
         print(f"F1-score: {f1:.4f}")
+        if auc_roc is not None:
+            print(f"ROC-AUC: {auc_roc:.4f}")
 
         return evaluation_results
 

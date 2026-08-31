@@ -1,4 +1,8 @@
-# Python
+# ============================================================================
+# AquaGuard Project .gitignore
+# ============================================================================
+
+# ===== Python =====
 __pycache__/
 *.py[cod]
 *$py.class
@@ -16,67 +20,144 @@ parts/
 sdist/
 var/
 wheels/
+pip-wheel-metadata/
+share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
 
-# Virtual Environment
+# ===== Virtual Environment =====
 venv/
+.venv/
 env/
 ENV/
 backend/venv/
+backend/.venv/
 
-# Environment variables
+# ===== Environment Variables & Secrets =====
 .env
+.env.local
+.env.*.local
 *.env
 !.env.example
+config.local.*
 
-# IDE
+# ===== ESP32 Local Configuration =====
+esp32/**/local_config.h
+
+# ===== IDE & Editors =====
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
 
-# OS
+# ===== Operating System =====
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+Desktop.ini
 
-# Testing
+# ===== Testing & Coverage =====
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
 .hypothesis/
+.tox/
+.nox/
+coverage/
+*.cover
+.cache
+nosetests.xml
+coverage.xml
+*.coveragerc
 
-# ML Models and Data
+# ===== Machine Learning =====
 backend/ml/models/*
-backend/ml/data/
+backend/ml/data/*.csv
 *.joblib
 *.pkl
+*.pickle
 *.h5
 *.model
-# Keep the validated four-sensor production artifacts with the project.
+*.weights
+
+# Keep production models
 !backend/ml/models/classifier_v2.0/
 !backend/ml/models/classifier_v2.0/model.joblib
 !backend/ml/models/classifier_v2.0/metadata.json
 !backend/ml/models/risk_predictor_v2.0/
 !backend/ml/models/risk_predictor_v2.0/model.joblib
 !backend/ml/models/risk_predictor_v2.0/metadata.json
+!backend/ml/data/sample_training_data.csv
 
-
-# Logs
+# ===== Logs & Temporary Files =====
 *.log
 logs/
-
-# Temporary files
 *.tmp
 *.bak
 *.cache
+*.temp
+server.out.log
+server.err.log
 
-# Node modules (for future frontend)
+# ===== Node.js & React Native =====
 node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.eslintcache
+.node_repl_history
+*.tgz
+.yarn-integrity
+package-lock.json
+yarn.lock
 
-# Kiro AI assistant files (remove before submission)
+# React Native
+.expo/
+.expo-shared/
+dist/
+web-build/
+
+# ===== Database =====
+*.db
+*.sqlite
+*.sqlite3
+data/
+dump/
+
+# ===== Build Outputs =====
+*.apk
+*.ipa
+*.app
+build/
+android/app/build/
+ios/build/
+*.bundle
+
+# ===== Documentation =====
+*.pdf
+*.docx
+docs/_build/
+
+# ===== Misc =====
 .kiro/
-# Local ESP32 private settings
-esp32/**/local_config.h
+*.swp
+*~
+.project
+.metadata
+bin/
+tmp/
+*.class
