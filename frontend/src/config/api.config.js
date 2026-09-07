@@ -14,14 +14,14 @@ const CONFIG = {
   PC_WIFI_IP: '172.20.10.5',
 
   // Backend port.
-  BACKEND_PORT: '8080',
+  BACKEND_PORT: '8000',
 
   // Set this only when the backend is deployed to a stable HTTPS address.
   PRODUCTION_URL: null,
 
   // true = real phone on the same Wi-Fi/hotspot as the computer.
   // false = Android Studio emulator.
-  USE_PHYSICAL_DEVICE: false,
+  USE_PHYSICAL_DEVICE: true,
 };
 
 const uniqueUrls = urls => Array.from(new Set(urls.filter(Boolean)));

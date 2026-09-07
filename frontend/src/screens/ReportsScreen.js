@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -35,11 +36,18 @@ const ReportsScreen = () => {
     }
   }, []);
 
+  // Auto-refresh every 30 seconds
   useEffect(() => {
-    fetchInsights();
     const interval = setInterval(fetchInsights, 30000);
     return () => clearInterval(interval);
   }, [fetchInsights]);
+
+  // Refresh data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchInsights();
+    }, [fetchInsights])
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

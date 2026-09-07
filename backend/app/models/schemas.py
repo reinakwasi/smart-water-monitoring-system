@@ -100,11 +100,12 @@ class SensorDataRequest(BaseModel):
 
 class TankLevelRequest(BaseModel):
     """
-    Request model for tank level data from ESP32    """
+    Request model for ultrasonic distance sensor data from ESP32
+    """
     device_id: str = Field(..., min_length=1, max_length=100, description="Unique device identifier")
     timestamp: datetime = Field(default_factory=datetime.utcnow, description="Reading timestamp; server time is used when the device omits it")
-    distance_cm: float = Field(..., ge=0.0, le=500.0, description="Distance from sensor to water surface in cm")
-    tank_height_cm: float = Field(..., ge=0.0, le=500.0, description="Total tank height in cm")
+    distance_cm: float = Field(..., ge=0.0, le=500.0, description="Distance measured by ultrasonic sensor in cm")
+    tank_height_cm: float = Field(default=200.0, ge=0.0, le=500.0, description="Total tank height in cm (from sensor to bottom)")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -322,12 +323,11 @@ class SensorDataResponse(BaseModel):
 
 class TankLevelResponse(BaseModel):
     """
-    Response for tank level data    """
+    Response for ultrasonic distance sensor data
+    """
     status: str = Field(..., description="Response status")
     reading_id: str = Field(..., description="MongoDB ObjectId of stored reading")
-    tank_status: TankStatus = Field(..., description="Tank status classification")
-    level_percent: float = Field(..., ge=0.0, le=100.0, description="Tank level percentage")
-    volume_liters: float = Field(..., ge=0.0, description="Estimated water volume in liters")
+    distance_cm: float = Field(..., ge=0.0, le=500.0, description="Distance measured in cm")
     timestamp: datetime = Field(..., description="Response timestamp")
 
     model_config = ConfigDict(
@@ -335,9 +335,7 @@ class TankLevelResponse(BaseModel):
             "example": {
                 "status": "success",
                 "reading_id": "65a1b2c3d4e5f6g7h8i9j0k2",
-                "tank_status": "Half_Full",
-                "level_percent": 55.0,
-                "volume_liters": 550.0,
+                "distance_cm": 45.2,
                 "timestamp": "2025-01-15T10:30:01Z"
             }
         }

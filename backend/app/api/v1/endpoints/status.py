@@ -32,11 +32,11 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/status", tags=["Status"])
 
 
-# Simple in-memory cache for current status (30 second TTL)
+# Simple in-memory cache for current status (DISABLED for real-time updates)
 _status_cache = {
     "data": None,
     "timestamp": None,
-    "ttl_seconds": 2,
+    "ttl_seconds": 0,  # Cache disabled - always fetch fresh data
     "entries": {},
 }
 
@@ -317,12 +317,41 @@ async def get_current_status(
         )
 
         # Step 5: Build tank level status
-        tank_level_status = TankLevelStatus(
-            status=TankStatus(latest_tank_reading["tank_status"]),
-            level_percent=latest_tank_reading["level_percent"],
-            volume_liters=latest_tank_reading["volume_liters"],
-            timestamp=tank_display_timestamp or latest_tank_reading["timestamp"]
-        )
+        # Handle backward compatibility with old tank readings that don't have calculated fields
+        if "tank_status" in latest_tank_reading:
+            tank_level_status = TankLevelStatus(
+                status=TankStatus(latest_tank_reading["tank_status"]),
+                level_percent=latest_tank_reading["level_percent"],
+                volume_liters=latest_tank_reading.get("volume_liters", 0.0),  # May be 0 if calculated by frontend
+                timestamp=tank_display_timestamp or latest_tank_reading["timestamp"]
+            )
+        else:
+            # Old tank reading - only has distance_cm, calculate on the fly
+            distance_cm = latest_tank_reading.get("distance_cm", 0)
+            tank_height_cm = latest_tank_reading.get("tank_height_cm", 200.0)
+            water_level_cm = max(0, tank_height_cm - distance_cm)
+            level_percent = min(100, max(0, (water_level_cm / tank_height_cm) * 100)) if tank_height_cm > 0 else 0
+            
+            # Determine status using correct thresholds
+            # 0-10% → Empty, 11-25% → Low, 26-75% → Half Full, 76-99% → Full, 100%+ → Overflow
+            # Changed overflow threshold from 5cm to 2cm to match ESP32 firmware
+            if distance_cm < 2:
+                tank_status_str = "Overflow"
+            elif level_percent >= 76:
+                tank_status_str = "Full"
+            elif level_percent >= 26:
+                tank_status_str = "Half_Full"
+            elif level_percent >= 11:
+                tank_status_str = "Low"
+            else:
+                tank_status_str = "Empty"
+            
+            tank_level_status = TankLevelStatus(
+                status=TankStatus(tank_status_str),
+                level_percent=round(level_percent, 1),
+                volume_liters=0.0,  # Frontend calculates from level_percent and user settings
+                timestamp=tank_display_timestamp or latest_tank_reading["timestamp"]
+            )
 
         # Step 6: Build complete response
         response_data = {

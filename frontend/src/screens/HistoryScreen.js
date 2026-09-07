@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
   View,
@@ -67,9 +68,17 @@ const HistoryScreen = ({ navigation }) => {
     }
   }, [timeRange]);
 
+  // Load data on mount
   useEffect(() => {
     fetchHistoryData();
   }, [fetchHistoryData]);
+
+  // Refresh data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchHistoryData();
+    }, [fetchHistoryData])
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);

@@ -134,7 +134,8 @@ async def health_check(
         # Query all registered sensor devices
         sensor_devices_cursor = db.sensor_devices.find({})
 
-        offline_threshold = datetime.utcnow() - timedelta(minutes=5)
+        # Device is offline after 2 minutes (120 seconds) - aligns with 30-second data transmission interval
+        offline_threshold = datetime.utcnow() - timedelta(minutes=2)
 
         async for device in sensor_devices_cursor:
             device_id = device["device_id"]
@@ -145,10 +146,10 @@ async def health_check(
                 sort=[("timestamp", -1)]
             )
 
-            if latest_reading:
+            if last_communication:
                 last_communication = latest_reading["timestamp"]
 
-                # Device is online if it communicated within the last 5 minutes
+                # Device is online if it communicated within the last 2 minutes
                 if last_communication >= offline_threshold:
                     device_status = "online"
                 else:

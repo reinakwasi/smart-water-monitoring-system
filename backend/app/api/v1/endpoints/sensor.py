@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from datetime import datetime, timedelta
 from bson import ObjectId
-import math
 
 from app.db.mongodb import mongodb
 from app.dependencies import verify_device_api_key
@@ -157,54 +156,6 @@ def classify_risk_level(risk_score: float) -> RiskLevel:
         return RiskLevel.MEDIUM
     else:
         return RiskLevel.LOW
-
-
-def classify_tank_status(level_percent: float) -> TankStatus:
-    """
-    Classify tank status based on level percentage
-
-    Thresholds match Chapter 3 Algorithm 4:
-    - Empty: <= 5%
-    - Low: > 5% and <= 25%
-    - Half: > 25% and <= 75%
-    - Full: > 75% and <= 95%
-    - Overflow: > 95%
-
-    Args:
-        level_percent: Tank level percentage (0-100)
-
-    Returns:
-        TankStatus enum (Empty, Low, Half_Full, Full, Overflow)
-    """
-    if level_percent > 95.0:
-        return TankStatus.OVERFLOW
-    elif level_percent > 75.0:
-        return TankStatus.FULL
-    elif level_percent > 25.0:
-        return TankStatus.HALF_FULL
-    elif level_percent > 5.0:
-        return TankStatus.LOW
-    else:
-        return TankStatus.EMPTY
-
-
-def calculate_tank_volume(level_percent: float, tank_height_cm: float, tank_diameter_cm: float = 100.0) -> float:
-    """
-    Calculate tank volume in liters based on level percentage    Assumes cylindrical tank: Volume = π * r² * h
-
-    Args:
-        level_percent: Tank level percentage (0-100)
-        tank_height_cm: Total tank height in cm
-        tank_diameter_cm: Tank diameter in cm (default: 100cm)
-
-    Returns:
-        Volume in litres
-    """
-    radius_cm = tank_diameter_cm / 2.0
-    water_height_cm = (level_percent / 100.0) * tank_height_cm
-    volume_cm3 = math.pi * (radius_cm ** 2) * water_height_cm
-    volume_liters = volume_cm3 / 1000.0  # Convert cm³ to liters
-    return round(volume_liters, 2)
 
 
 @router.post(
@@ -657,8 +608,8 @@ async def ingest_sensor_data(
     response_model=TankLevelResponse,
     status_code=status.HTTP_201_CREATED,
     responses={
-        201: {"description": "Tank level data processed successfully"},
-        400: {"model": ErrorResponse, "description": "Invalid tank level data"},
+        201: {"description": "Distance data processed successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid distance data"},
         429: {"model": ErrorResponse, "description": "Rate limit exceeded"},
         500: {"model": ErrorResponse, "description": "Internal server error"}
     }
@@ -671,16 +622,14 @@ async def ingest_tank_level(
     device_association: dict = Depends(verify_device_api_key),
 ):
     """
-    Ingest tank level data from ESP32 ultrasonic sensor
+    Ingest ultrasonic distance sensor data from ESP32
 
     Rate limit: 100 requests per minute per IP address
 
     This endpoint:
-    1. Accepts TankLevelRequest payload from ESP32
-    2. Calculates tank level percentage and volume
-    3. Classifies tank status (Empty, Half_Full, Full, Overflow)
-    4. Persists tank reading to MongoDB
-    5. Returns tank status response
+    1. Accepts distance measurement from ESP32 ultrasonic sensor
+    2. Persists raw distance reading to MongoDB
+    3. Returns distance measurement response
 
     Args:
         request: FastAPI request object (for rate limiting)
@@ -688,17 +637,16 @@ async def ingest_tank_level(
         db: MongoDB database instance
 
     Returns:
-        TankLevelResponse with tank status, level percentage, and volume
+        TankLevelResponse with distance measurement
 
     Raises:
-        HTTPException: 400 if distance exceeds tank height
         HTTPException: 429 if rate limit exceeded
         HTTPException: 500 if processing fails
     """
     device_association = await resolve_upload_device(db, device_association, tank_data.device_id)
     tank_data.device_id = device_association.get("device_id", tank_data.device_id)
     logger.info(
-        f"Received tank level data from device: {tank_data.device_id}",
+        f"Received distance data from device: {tank_data.device_id}",
         extra={
             "extra_fields": {
                 "device_id": tank_data.device_id,
@@ -709,83 +657,55 @@ async def ingest_tank_level(
     )
 
     try:
-        # Validate that distance doesn't exceed tank height
-        if tank_data.distance_cm > tank_data.tank_height_cm:
-            logger.warning(
-                f"Invalid tank level data: distance ({tank_data.distance_cm}cm) exceeds tank height ({tank_data.tank_height_cm}cm)",
-                extra={
-                    "extra_fields": {
-                        "device_id": tank_data.device_id,
-                        "distance_cm": tank_data.distance_cm,
-                        "tank_height_cm": tank_data.tank_height_cm
-                    }
-                }
-            )
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Distance ({tank_data.distance_cm}cm) cannot exceed tank height ({tank_data.tank_height_cm}cm)"
-            )
-
-        # Step 1: Calculate tank level percentage
-        water_height_cm = tank_data.tank_height_cm - tank_data.distance_cm
-        level_percent = (water_height_cm / tank_data.tank_height_cm) * 100.0
-        level_percent = max(0.0, min(100.0, level_percent))  # Clamp to [0, 100]
-        level_percent = round(level_percent, 1)
-
-        logger.debug(
-            f"Calculated tank level: {level_percent}%",
-            extra={
-                "extra_fields": {
-                    "device_id": tank_data.device_id,
-                    "level_percent": level_percent
-                }
-            }
-        )
-
-        # Step 2: Classify tank status
-        tank_status = classify_tank_status(level_percent)
-
-        logger.info(
-            f"Tank status classified as {tank_status.value}",
-            extra={
-                "extra_fields": {
-                    "device_id": tank_data.device_id,
-                    "tank_status": tank_status.value,
-                    "level_percent": level_percent
-                }
-            }
-        )
-
-        # Step 3: Calculate tank volume
-        # Use default diameter of 100cm (can be made configurable later)
-        volume_liters = calculate_tank_volume(
-            level_percent,
-            tank_data.tank_height_cm,
-            tank_diameter_cm=100.0
-        )
-
-        logger.debug(
-            f"Calculated tank volume: {volume_liters}L",
-            extra={
-                "extra_fields": {
-                    "device_id": tank_data.device_id,
-                    "volume_liters": volume_liters
-                }
-            }
-        )
-
-        # Step 4: Persist tank reading
-        logger.debug(f"Persisting tank reading to database")
+        # Calculate tank metrics
+        tank_height_cm = tank_data.tank_height_cm
+        distance_cm = tank_data.distance_cm
+        
+        # Calculate water level (inverse relationship: small distance = high water level)
+        # Water level = tank height - distance from sensor
+        water_level_cm = max(0, tank_height_cm - distance_cm)
+        
+        # Calculate percentage (0% = empty, 100% = full)
+        if tank_height_cm > 0:
+            level_percent = (water_level_cm / tank_height_cm) * 100
+            level_percent = min(100, max(0, level_percent))
+        else:
+            level_percent = 0
+        
+        # Determine tank status based on specified thresholds
+        # 0-10% → Empty, 11-25% → Low, 26-75% → Half Full, 76-99% → Full, 100%+ → Overflow
+        # Changed overflow threshold from 5cm to 2cm to match ESP32 firmware
+        if distance_cm < 2:
+            # Water too close to sensor = overflow
+            tank_status = "Overflow"
+            level_percent = 100
+        elif level_percent >= 76:
+            tank_status = "Full"
+        elif level_percent >= 26:
+            tank_status = "Half_Full"
+        elif level_percent >= 11:
+            tank_status = "Low"
+        else:
+            # 0% to 10%
+            tank_status = "Empty"
+        
+        # DO NOT calculate volume here - frontend calculates it from level_percent
+        # and user's configured tank capacity in liters
+        # Volume = (level_percent / 100) * user_configured_capacity_liters
+        
+        # Persist distance reading with calculated metrics
+        logger.debug(f"Persisting distance reading to database")
         received_at = datetime.utcnow()
         tank_doc = {
             "device_id": tank_data.device_id,
             "timestamp": received_at,
             "device_timestamp": tank_data.timestamp,
             "distance_cm": tank_data.distance_cm,
-            "tank_height_cm": tank_data.tank_height_cm,
-            "level_percent": level_percent,
-            "volume_liters": volume_liters,
-            "tank_status": tank_status.value,
+            "tank_height_cm": tank_height_cm,
+            "water_level_cm": round(water_level_cm, 1),
+            "level_percent": round(level_percent, 1),
+            "volume_liters": 0.0,  # Deprecated - frontend calculates from level_percent
+            "tank_status": tank_status,
             "created_at": received_at
         }
 
@@ -793,7 +713,7 @@ async def ingest_tank_level(
         reading_id = str(result.inserted_id)
 
         logger.info(
-            f"Tank reading persisted successfully with ID: {reading_id}",
+            f"Distance reading persisted successfully with ID: {reading_id}",
             extra={
                 "extra_fields": {
                     "device_id": tank_data.device_id,
@@ -802,114 +722,23 @@ async def ingest_tank_level(
             }
         )
 
-        tank_alerts = {
-            "Empty": ("Tank is empty", "The tank is at or below 5%. Plan a refill.", "high"),
-            "Low": ("Tank level is low", f"The tank is at {level_percent:.0f}%. Plan a refill soon.", "attention"),
-            "Half_Full": ("Tank is half full", f"The tank is at {level_percent:.0f}% and has reached the half-full stage.", "info"),
-            "Full": ("Tank is full", f"The tank is at {level_percent:.0f}%. Stop or check the inlet supply.", "attention"),
-            "Overflow": ("Tank overflow detected", "The measured level indicates overflow. Check the inlet and level sensor immediately.", "high"),
-        }
-        tank_title, tank_message, tank_severity = tank_alerts[tank_status.value]
-        await record_in_app_alert(
-            db,
-            device_association,
-            tank_data.device_id,
-            "tank_status",
-            tank_title,
-            tank_message,
-            tank_severity,
-            reading_id,
-            "alert_on_tank_critical",
-        )
-
-        # Step 5: Check for tank status changes and send notifications
-        try:
-            from app.services.notification_service import get_notification_service
-            notification_service = get_notification_service()
-
-            if notification_service:
-                # Query previous tank reading for this device
-                previous_reading = await db.tank_readings.find_one(
-                    {
-                        "device_id": tank_data.device_id,
-                        "_id": {"$ne": result.inserted_id}
-                    },
-                    sort=[("timestamp", -1)]
-                )
-
-                if previous_reading:
-                    # Get active user FCM tokens
-                    user_tokens = await notification_service.get_device_owner_tokens(tank_data.device_id, db)
-
-                    if user_tokens:
-                        # Check for tank status change to critical states
-                        previous_tank_status = previous_reading.get("tank_status")
-
-                        # Only send notification if status changed AND new status is critical
-                        critical_statuses = ["Overflow", "Full", "Empty"]
-                        if (previous_tank_status and
-                            previous_tank_status != tank_status.value and
-                            tank_status.value in critical_statuses):
-
-                            logger.info(
-                                f"Tank status changed to critical state: {previous_tank_status} -> {tank_status.value}",
-                                extra={
-                                    "extra_fields": {
-                                        "device_id": tank_data.device_id,
-                                        "old_tank_status": previous_tank_status,
-                                        "new_tank_status": tank_status.value,
-                                        "level_percent": level_percent
-                                    }
-                                }
-                            )
-
-                            # Send tank status notification
-                            await notification_service.send_tank_notification(
-                                user_tokens=user_tokens,
-                                tank_status=tank_status.value,
-                                level_percent=level_percent,
-                                device_id=tank_data.device_id,
-                                device_name=device_association.get("device_name", tank_data.device_id),
-                            )
-                    else:
-                        logger.debug("No active user FCM tokens found for notifications")
-                else:
-                    logger.debug(f"No previous tank reading found for device {tank_data.device_id}")
-            else:
-                logger.debug("Notification service not initialized, skipping notifications")
-        except Exception as e:
-            # Log error but don't fail the request
-            logger.error(
-                f"Error sending tank notifications: {str(e)}",
-                extra={
-                    "extra_fields": {
-                        "device_id": tank_data.device_id,
-                        "error": str(e)
-                    }
-                },
-                exc_info=True
-            )
-
-        # Step 5: Build and return response
+        # Build and return response
         response_timestamp = datetime.utcnow()
 
         response = TankLevelResponse(
             status="success",
             reading_id=reading_id,
-            tank_status=tank_status,
-            level_percent=level_percent,
-            volume_liters=volume_liters,
+            distance_cm=tank_data.distance_cm,
             timestamp=response_timestamp
         )
 
         logger.info(
-            f"Tank level processing completed successfully for device {tank_data.device_id}",
+            f"Distance data processing completed successfully for device {tank_data.device_id}",
             extra={
                 "extra_fields": {
                     "device_id": tank_data.device_id,
                     "reading_id": reading_id,
-                    "tank_status": tank_status.value,
-                    "level_percent": level_percent
+                    "distance_cm": tank_data.distance_cm
                 }
             }
         )
@@ -921,7 +750,7 @@ async def ingest_tank_level(
         raise
     except Exception as e:
         logger.error(
-            f"Error processing tank level data from device {tank_data.device_id}: {str(e)}",
+            f"Error processing distance data from device {tank_data.device_id}: {str(e)}",
             extra={
                 "extra_fields": {
                     "device_id": tank_data.device_id,
@@ -932,5 +761,6 @@ async def ingest_tank_level(
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to process tank level data: {str(e)}"
+            detail=f"Failed to process distance data: {str(e)}"
         )
+

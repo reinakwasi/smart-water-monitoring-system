@@ -204,7 +204,7 @@ const SettingsScreen = ({ navigation }) => {
     if (!capacity) {
       showAppAlert(
         'Check tank capacity',
-        'Enter the size of your container in litres, for example 500.',
+        'Enter the size of your container in milliliters, for example 1000.',
         [{ text: 'OK' }],
         'warning',
       );
@@ -341,7 +341,7 @@ const SettingsScreen = ({ navigation }) => {
               </View>
               <View className="flex-1">
                 <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>Tank capacity</Text>
-                <Text className="text-xs" style={{ color: theme.colors.textSecondary }}>Set your water container size in litres</Text>
+                <Text className="text-xs" style={{ color: theme.colors.textSecondary }}>Set your water container size in milliliters</Text>
               </View>
             </View>
 
@@ -350,7 +350,7 @@ const SettingsScreen = ({ navigation }) => {
                 value={tankCapacityInput}
                 onChangeText={setTankCapacityInput}
                 keyboardType="numeric"
-                placeholder="500"
+                placeholder="1000"
                 placeholderTextColor={theme.colors.textTertiary}
                 className="flex-1 h-12 rounded-xl px-4 text-base font-semibold"
                 style={{
@@ -359,9 +359,9 @@ const SettingsScreen = ({ navigation }) => {
                   borderWidth: 1,
                   borderColor: theme.colors.border,
                 }}
-                accessibilityLabel="Tank capacity in litres"
+                accessibilityLabel="Tank capacity in milliliters"
               />
-              <Text className="mx-3 text-sm font-semibold" style={{ color: theme.colors.textSecondary }}>L</Text>
+              <Text className="mx-3 text-sm font-semibold" style={{ color: theme.colors.textSecondary }}>ml</Text>
               <TouchableOpacity
                 className="h-12 px-4 rounded-xl items-center justify-center bg-[#0891B2]"
                 onPress={saveTankCapacity}

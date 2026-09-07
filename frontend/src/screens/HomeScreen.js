@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -88,11 +89,18 @@ const HomeScreen = ({ navigation }) => {
     return () => clearInterval(greetingInterval);
   }, [updateGreeting]);
 
+  // Auto-refresh every 30 seconds when screen is visible
   useEffect(() => {
-    fetchCurrentStatus();
     const statusInterval = setInterval(fetchCurrentStatus, 30000);
     return () => clearInterval(statusInterval);
   }, [fetchCurrentStatus]);
+
+  // Refresh data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchCurrentStatus();
+    }, [fetchCurrentStatus])
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -290,7 +298,7 @@ const HomeScreen = ({ navigation }) => {
                 <Text className="text-xs font-semibold" style={{ color: tankTone.color }}>{tankStatus.status}</Text>
               </View>
               <Text className="text-xs mt-3" style={{ color: theme.colors.textSecondary }}>
-                {tankStatus.volumeLitres} L of {tankStatus.totalCapacity} L available
+                {tankStatus.volumeLitres} of {tankStatus.totalCapacity} available
               </Text>
             </View>
             <View className="w-16 h-24 rounded-2xl border-2 overflow-hidden justify-end" style={{ borderColor: theme.colors.border }}>

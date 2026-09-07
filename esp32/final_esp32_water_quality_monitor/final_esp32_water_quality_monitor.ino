@@ -77,10 +77,9 @@ int phAnalogBufferIndex = 0;
 #define TURBIDITY_CLOUDY_REFERENCE_NTU 400.0
 
 // ===================== PH CALIBRATION ====================
-// Two-point calibration from the tested probe:
-// near-neutral water: pH 7.0 at 2.60V
-// alkaline washing-powder sample: pH 10.0 at 2.05V
-// pH = (PH_SLOPE * voltage) + PH_OFFSET
+// Two-point linear calibration from project documentation
+// Tested with sachet water (pH 7.08), washing powder (pH 9.93), and Coca-Cola (pH 3.19)
+// Formula: pH = -5.45 × Voltage + 21.17
 #define PH_SLOPE -5.45
 #define PH_OFFSET 21.17
 
@@ -97,6 +96,13 @@ float turbidityNTU = 0.0;
 float phVoltage = 0.0;
 float phValue = 7.0;
 float distanceCm = 0.0;
+
+// ===================== TANK CONFIGURATION ================
+// Set this to the height of your container in centimeters
+// Measure from bottom of container to where sensor is mounted at top
+// For 1000ml bottle: typically 20-25 cm
+// For large water tank: could be 100-200 cm
+#define TANK_HEIGHT_CM 22.6
 
 // ===================== TIMING ============================
 unsigned long lastSendTime = 0;
@@ -139,9 +145,11 @@ float readPH() {
   }
 
   int medianValue = getMedianNum(phAnalogBuffer, SCOUNT);
-  phVoltage = medianValue * VREF / 4096.0;
+  phVoltage = medianValue * VREF / 4095.0;  // ESP32 12-bit ADC: 0-4095
 
+  // Apply two-point linear calibration: pH = -5.45 × Voltage + 21.17
   float ph = (PH_SLOPE * phVoltage) + PH_OFFSET;
+  
   return clampFloat(ph, 0.0, 14.0);
 }
 
@@ -223,7 +231,7 @@ void sendTankLevel(float distance) {
   StaticJsonDocument<200> doc;
   doc["device_id"] = deviceId;
   doc["distance_cm"] = distance;
-  doc["tank_height_cm"] = 200.0;
+  doc["tank_height_cm"] = TANK_HEIGHT_CM;  // Use configured tank height
 
   String jsonPayload;
   serializeJson(doc, jsonPayload);
@@ -304,6 +312,16 @@ void setup() {
 
   tempSensor.begin();
   connectWiFi();
+  
+  // Display tank configuration
+  Serial.println();
+  Serial.println("===== TANK CONFIGURATION =====");
+  Serial.print("Tank height: ");
+  Serial.print(TANK_HEIGHT_CM);
+  Serial.println(" cm");
+  Serial.println("==============================");
+  Serial.println();
+  
   delay(2000);
 }
 
@@ -333,7 +351,7 @@ void loop() {
     }
 
     int medianValue = getMedianNum(analogBuffer, SCOUNT);
-    averageVoltage = medianValue * VREF / 4096.0;
+    averageVoltage = medianValue * VREF / 4095.0;  // ESP32 12-bit ADC: 0-4095
     float compensationCoefficient = 1.0 + 0.02 * (temperature - 25.0);
     float compensationVoltage = averageVoltage / compensationCoefficient;
     tdsValue = (133.42 * compensationVoltage * compensationVoltage * compensationVoltage
@@ -354,13 +372,44 @@ void loop() {
 
     phValue = readPH();
     distanceCm = readDistanceCm();
+    
+    // Calculate tank level percentage
+    float waterLevelCm = 0.0;
+    float levelPercent = 0.0;
+    String tankStatus = "Unknown";
+    
+    if (distanceCm > 0 && distanceCm < 400) {
+      waterLevelCm = TANK_HEIGHT_CM - distanceCm;
+      if (waterLevelCm < 0) waterLevelCm = 0;
+      
+      levelPercent = (waterLevelCm / TANK_HEIGHT_CM) * 100.0;
+      if (levelPercent > 100) levelPercent = 100;
+      if (levelPercent < 0) levelPercent = 0;
+      
+      // Determine status
+      // Changed overflow threshold from 5cm to 2cm to avoid false overflow alerts
+      if (distanceCm < 2) {
+        tankStatus = "Overflow";
+        levelPercent = 100;
+      } else if (levelPercent >= 76) {
+        tankStatus = "Full";
+      } else if (levelPercent >= 26) {
+        tankStatus = "Half_Full";
+      } else if (levelPercent >= 11) {
+        tankStatus = "Low";
+      } else {
+        tankStatus = "Empty";
+      }
+    }
 
     Serial.print("pH: ");
     if (PH_SENSOR_CONNECTED) {
-      Serial.print(phValue, 1);
-      Serial.print("(");
-      Serial.print(phVoltage, 2);
-      Serial.print("V)");
+      Serial.print(phValue, 2);
+      Serial.print(" (");
+      Serial.print(phVoltage, 3);
+      Serial.print("V, ADC:");
+      Serial.print(getMedianNum(phAnalogBuffer, SCOUNT));
+      Serial.print(")");
     } else {
       Serial.print("sensor disabled - sending neutral pH 7.0");
     }
@@ -373,9 +422,11 @@ void loop() {
     }
     Serial.print(" | TDS: ");
     Serial.print(tdsValue, 0);
-    Serial.print("ppm(");
+    Serial.print("ppm (");
     Serial.print(averageVoltage, 2);
-    Serial.print("V) | Turbidity: ");
+    Serial.print("V, ADC:");
+    Serial.print(getMedianNum(analogBuffer, SCOUNT));
+    Serial.print(") | Turbidity: ");
     Serial.print(turbidityNTU, 1);
     Serial.print(" NTU(");
     Serial.print(turbidityVoltage, 2);
@@ -384,7 +435,11 @@ void loop() {
       Serial.print("ERROR");
     } else {
       Serial.print(distanceCm, 1);
-      Serial.print("cm");
+      Serial.print("cm (");
+      Serial.print(levelPercent, 1);
+      Serial.print("% - ");
+      Serial.print(tankStatus);
+      Serial.print(")");
     }
     Serial.println();
   }

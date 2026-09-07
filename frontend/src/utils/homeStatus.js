@@ -1,9 +1,9 @@
 import { classifyParameter } from './parameterClassification';
 
 export const APP_SETTINGS_KEY = '@app_settings';
-export const DEFAULT_TANK_CAPACITY_LITRES = 500;
-export const DEVICE_OFFLINE_AFTER_MS = 90 * 1000;
-export const DEVICE_CLOCK_SKEW_TOLERANCE_MS = 2 * 60 * 1000;
+export const DEFAULT_TANK_CAPACITY_LITRES = 1000;
+export const DEVICE_OFFLINE_AFTER_MS = 120000; // 120 seconds (2 minutes)
+export const DEVICE_CLOCK_SKEW_TOLERANCE_MS = 120000; // 120 seconds (2 minutes)
 
 const finiteNumber = (value, fallback = null) => {
   const parsed = Number(value);

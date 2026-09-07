@@ -4,7 +4,7 @@ echo   AquaGuard Backend Server
 echo ========================================
 echo.
 echo Starting backend server...
-echo Server will run on http://0.0.0.0:8080
+echo Server will run on http://0.0.0.0:8000
 echo.
 echo Press Ctrl+C to stop the server
 echo ========================================
@@ -18,6 +18,6 @@ if not exist ".venv\Scripts\python.exe" (
     exit /b 1
 )
 
-".venv\Scripts\python.exe" -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
+".venv\Scripts\python.exe" -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 pause

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -61,11 +62,18 @@ const TankScreen = () => {
     }
   }, []);
 
+  // Auto-refresh every 30 seconds when screen is visible
   useEffect(() => {
-    fetchTankStatus();
     const interval = setInterval(fetchTankStatus, 30000);
     return () => clearInterval(interval);
   }, [fetchTankStatus]);
+
+  // Refresh data when screen comes into focus (navigating to this screen)
+  useFocusEffect(
+    useCallback(() => {
+      fetchTankStatus();
+    }, [fetchTankStatus])
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -144,7 +152,7 @@ const TankScreen = () => {
                 <Text className="text-sm font-semibold" style={{ color: tone.color }}>{tank.status}</Text>
               </View>
               <Text className="text-sm mt-3" style={{ color: theme.colors.textSecondary }}>
-                {tank.volumeLitres} litres currently available
+                {tank.volumeLitres} currently available
               </Text>
             </View>
           )}
@@ -155,7 +163,7 @@ const TankScreen = () => {
             <View className="w-11 h-11 rounded-xl bg-cyan-50 justify-center items-center mb-3">
               <MaterialCommunityIcons name="cup-water" size={23} color={theme.colors.primary} />
             </View>
-            <Text className="text-2xl font-bold" style={{ color: theme.colors.text }}>{tank.totalCapacity} L</Text>
+            <Text className="text-2xl font-bold" style={{ color: theme.colors.text }}>{tank.totalCapacity}</Text>
             <Text className="text-xs mt-1" style={{ color: theme.colors.textSecondary }}>Container capacity</Text>
           </View>
           <View className="w-[48%] rounded-2xl p-4 border" style={{ backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }}>
