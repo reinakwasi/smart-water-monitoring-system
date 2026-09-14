@@ -21,7 +21,7 @@ const CONFIG = {
 
   // true = real phone on the same Wi-Fi/hotspot as the computer.
   // false = Android Studio emulator.
-  USE_PHYSICAL_DEVICE: true,
+  USE_PHYSICAL_DEVICE: false,
 };
 
 const uniqueUrls = urls => Array.from(new Set(urls.filter(Boolean)));
